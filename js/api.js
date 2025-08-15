@@ -66,9 +66,17 @@ const API = (function() {
         async updateChildBalance(childId, amount) {
             return request(`/children/${childId}/balance`, 'PUT', { amount });
         },
-        
+
         async getChildDetails(childId) {
             return request(`/children/${childId}`);
+        },
+
+        async deleteChild(childId) {
+            return request(`/children/${childId}`, 'DELETE');
+        },
+
+        async updateChildPin(childId, pin) {
+            return request(`/children/${childId}/pin`, 'PUT', { pin });
         },
         
         // Goals endpoints (for future implementation)
