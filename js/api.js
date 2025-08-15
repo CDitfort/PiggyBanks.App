@@ -2,42 +2,9 @@
 const API = (function() {
     'use strict';
     
-    /**
-     * Base API request handler
-     */
-    async function request(endpoint, method = 'GET', body = null) {
-        const token = localStorage.getItem(CONFIG.TOKEN_KEY);
-        const headers = {
-            'Content-Type': 'application/json'
-        };
-        
-        if (token) {
-            headers['Authorization'] = `Bearer ${token}`;
-        }
-        
-        const options = {
-            method,
-            headers
-        };
-        
-        if (body && method !== 'GET') {
-            options.body = JSON.stringify(body);
-        }
-        
-        try {
-            const response = await fetch(`${CONFIG.API_BASE_URL}${endpoint}`, options);
-            const data = await response.json();
-            
-            if (!response.ok) {
-                throw new Error(data.error || 'Request failed');
-            }
-            
-            return data;
-        } catch (error) {
-            console.error('API request failed:', error);
-            throw error;
-        }
-    }
+    // Use the centralized request handler from Auth module
+    // This ensures consistency, deduplication, and proper request tracking
+    const request = Auth.request;
     
     return {
         // Transaction endpoints (for future implementation)
@@ -151,9 +118,15 @@ const API = (function() {
         
         async getFamilyStatistics() {
             return request('/statistics/family');
-        }
+        },
+        
+        // Expose request method for direct use if needed
+        request: request
     };
 })();
 
 // Make API available globally
 window.API = API;
+
+// Log when API module is loaded
+console.log('[API] Module loaded, using centralized Auth.request handler');

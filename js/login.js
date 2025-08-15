@@ -1,4 +1,10 @@
 document.addEventListener('DOMContentLoaded', () => {
+  console.log('[Login] Page initialized');
+  
+  // Request state tracking to prevent duplicate submissions
+  let parentLoginInProgress = false;
+  let childLoginInProgress = false;
+  
   // Redirect if already authenticated
   Auth.redirectIfAuthenticated();
   
@@ -118,6 +124,12 @@ document.addEventListener('DOMContentLoaded', () => {
     parentForm.addEventListener('submit', async (e) => {
       e.preventDefault();
       
+      // Check if a login is already in progress
+      if (parentLoginInProgress) {
+        console.log('[Login] Parent login already in progress, ignoring duplicate submission');
+        return;
+      }
+      
       // Clear error message
       if (parentErrorMessage) {
         parentErrorMessage.textContent = '';
@@ -134,23 +146,34 @@ document.addEventListener('DOMContentLoaded', () => {
         return;
       }
       
+      // Set login in progress flag
+      parentLoginInProgress = true;
+      console.log('[Login] Starting parent login for:', email);
+      
       // Disable form during submission
       setParentFormLoading(true);
       
       try {
+        const startTime = Date.now();
         const result = await Auth.loginParent(email, password);
+        const duration = Date.now() - startTime;
+        console.log(`[Login] Parent login completed in ${duration}ms`);
         
         if (result.success) {
+          console.log('[Login] Parent login successful, redirecting to dashboard');
           // Redirect to dashboard
           window.location.href = CONFIG.ROUTES.DASHBOARD;
         } else {
+          console.log('[Login] Parent login failed:', result.error);
           showParentError(result.error || 'Invalid email or password');
           setParentFormLoading(false);
+          parentLoginInProgress = false;
         }
       } catch (error) {
-        console.error('Parent login error:', error);
+        console.error('[Login] Parent login error:', error);
         showParentError('An unexpected error occurred. Please try again.');
         setParentFormLoading(false);
+        parentLoginInProgress = false;
       }
     });
   }
@@ -159,6 +182,12 @@ document.addEventListener('DOMContentLoaded', () => {
   if (childForm) {
     childForm.addEventListener('submit', async (e) => {
       e.preventDefault();
+      
+      // Check if a login is already in progress
+      if (childLoginInProgress) {
+        console.log('[Login] Child login already in progress, ignoring duplicate submission');
+        return;
+      }
       
       // Clear error message
       if (childErrorMessage) {
@@ -181,27 +210,38 @@ document.addEventListener('DOMContentLoaded', () => {
         return;
       }
       
+      // Set login in progress flag
+      childLoginInProgress = true;
+      console.log('[Login] Starting child login for:', username);
+      
       // Disable form during submission
       setChildFormLoading(true);
       
       try {
+        const startTime = Date.now();
         const result = await Auth.loginChild(username, pin);
+        const duration = Date.now() - startTime;
+        console.log(`[Login] Child login completed in ${duration}ms`);
         
         if (result.success) {
+          console.log('[Login] Child login successful, redirecting to dashboard');
           // Redirect to dashboard
           window.location.href = CONFIG.ROUTES.DASHBOARD;
         } else {
+          console.log('[Login] Child login failed:', result.error);
           showChildError(result.error || 'Invalid username or PIN');
           // Clear PIN inputs
           pinInputs.forEach(input => input.value = '');
           if (hiddenPin) hiddenPin.value = '';
           pinInputs[0].focus();
           setChildFormLoading(false);
+          childLoginInProgress = false;
         }
       } catch (error) {
-        console.error('Child login error:', error);
+        console.error('[Login] Child login error:', error);
         showChildError('An unexpected error occurred. Please try again.');
         setChildFormLoading(false);
+        childLoginInProgress = false;
       }
     });
   }
@@ -250,5 +290,31 @@ document.addEventListener('DOMContentLoaded', () => {
       inputs.forEach(input => input.disabled = false);
     }
   }
+  
+  // Add keyboard shortcut to submit forms (Enter key)
+  // This is already handled by default form submission, but we'll ensure it's working
+  if (parentForm) {
+    parentForm.querySelectorAll('input').forEach(input => {
+      input.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter' && !parentLoginInProgress) {
+          e.preventDefault();
+          parentForm.dispatchEvent(new Event('submit'));
+        }
+      });
+    });
+  }
+  
+  if (childForm) {
+    childForm.querySelectorAll('input:not(.pin-input)').forEach(input => {
+      input.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter' && !childLoginInProgress) {
+          e.preventDefault();
+          childForm.dispatchEvent(new Event('submit'));
+        }
+      });
+    });
+  }
+  
+  console.log('[Login] Event handlers attached successfully');
 });
 

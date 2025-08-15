@@ -1,11 +1,11 @@
 // Configuration for the Piggybanks app
 const CONFIG = {
-    // Firebase Functions URL - Update this with your actual Firebase Functions URL
-    // For local development with Firebase emulator: http://localhost:5001/YOUR_PROJECT_ID/us-central1/auth
-    // For production: https://us-central1-YOUR_PROJECT_ID.cloudfunctions.net/auth
-    API_BASE_URL: window.location.hostname === 'localhost' 
-        ? 'http://localhost:5001/piggybanks-app/us-central1/auth'
-        : 'https://us-central1-piggybanks-app.cloudfunctions.net/auth',
+    // Firebase Functions URL
+    // Local emulator (when hostname is localhost or 127.0.0.1): http://localhost:5001/piggybankapp-5681a/us-central1/auth
+    // Production: https://us-central1-piggybankapp-5681a.cloudfunctions.net/auth
+    API_BASE_URL: (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1')
+        ? 'http://localhost:5001/piggybankapp-5681a/us-central1/auth'
+        : 'https://us-central1-piggybankapp-5681a.cloudfunctions.net/auth',
     
     // Local storage keys
     TOKEN_KEY: 'piggybanks_token',

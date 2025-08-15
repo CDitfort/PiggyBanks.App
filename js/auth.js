@@ -2,6 +2,10 @@
 const Auth = (function() {
     'use strict';
     
+    // Request deduplication tracking
+    const pendingRequests = new Map();
+    const requestIdHeader = 'X-Request-ID';
+    
     // Private methods
     
     /**
@@ -36,40 +40,90 @@ const Auth = (function() {
     }
     
     /**
-     * Make authenticated API request
+     * Generate a unique request ID
      */
-    async function makeAuthRequest(endpoint, method = 'GET', body = null) {
-        const token = getToken();
-        const headers = {
-            'Content-Type': 'application/json'
-        };
+    function generateRequestId() {
+        return `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+    }
+    
+    /**
+     * Make authenticated API request with deduplication
+     */
+    async function makeAuthRequest(endpoint, method = 'GET', body = null, options = {}) {
+        // Create a request key for deduplication
+        const requestKey = `${method}:${endpoint}:${JSON.stringify(body || {})}`;
         
-        if (token) {
-            headers['Authorization'] = `Bearer ${token}`;
+        // Check if we have a pending request for the same operation
+        if (!options.allowDuplicate && pendingRequests.has(requestKey)) {
+            console.log(`[Auth] Duplicate request detected, waiting for existing: ${requestKey}`);
+            return pendingRequests.get(requestKey);
         }
         
-        const options = {
-            method,
-            headers
-        };
+        // Generate request ID for tracking
+        const requestId = generateRequestId();
         
-        if (body && method !== 'GET') {
-            options.body = JSON.stringify(body);
-        }
-        
-        try {
-            const response = await fetch(`${CONFIG.API_BASE_URL}${endpoint}`, options);
-            const data = await response.json();
+        // Create the request promise
+        const requestPromise = (async () => {
+            const token = getToken();
+            const headers = {
+                'Content-Type': 'application/json',
+                [requestIdHeader]: requestId
+            };
             
-            if (!response.ok) {
-                throw new Error(data.error || 'Request failed');
+            if (token) {
+                headers['Authorization'] = `Bearer ${token}`;
             }
             
-            return data;
-        } catch (error) {
-            console.error('API request failed:', error);
-            throw error;
+            const fetchOptions = {
+                method,
+                headers
+            };
+            
+            if (body && method !== 'GET') {
+                fetchOptions.body = JSON.stringify(body);
+            }
+            
+            console.log(`[Auth] API Request [${requestId}]:`, {
+                endpoint,
+                method,
+                hasBody: !!body,
+                hasToken: !!token
+            });
+            
+            try {
+                const startTime = Date.now();
+                const response = await fetch(`${CONFIG.API_BASE_URL}${endpoint}`, fetchOptions);
+                const data = await response.json();
+                const duration = Date.now() - startTime;
+                
+                console.log(`[Auth] API Response [${requestId}]:`, {
+                    status: response.status,
+                    duration: `${duration}ms`,
+                    success: response.ok
+                });
+                
+                if (!response.ok) {
+                    throw new Error(data.error || 'Request failed');
+                }
+                
+                return data;
+            } catch (error) {
+                console.error(`[Auth] API Request failed [${requestId}]:`, error);
+                throw error;
+            } finally {
+                // Remove from pending requests
+                if (!options.allowDuplicate) {
+                    pendingRequests.delete(requestKey);
+                }
+            }
+        })();
+        
+        // Store in pending requests if deduplication is enabled
+        if (!options.allowDuplicate) {
+            pendingRequests.set(requestKey, requestPromise);
         }
+        
+        return requestPromise;
     }
     
     /**
@@ -144,10 +198,11 @@ const Auth = (function() {
         },
         
         /**
-         * Login for parents (email + password)
+         * Login for parents (email + password) with deduplication
          */
         async loginParent(email, password) {
             try {
+                console.log('[Auth] Parent login attempt for:', email);
                 const result = await makeAuthRequest('/login', 'POST', {
                     email,
                     password
@@ -155,20 +210,23 @@ const Auth = (function() {
                 
                 if (result.success) {
                     storeAuthData(result.token, result.user);
+                    console.log('[Auth] Parent login successful');
                     return { success: true, message: result.message };
                 }
                 
                 return { success: false, error: result.error };
             } catch (error) {
+                console.error('[Auth] Parent login error:', error);
                 return { success: false, error: error.message };
             }
         },
         
         /**
-         * Login for children (username + pin)
+         * Login for children (username + pin) with deduplication
          */
         async loginChild(username, pin) {
             try {
+                console.log('[Auth] Child login attempt for:', username);
                 const result = await makeAuthRequest('/login', 'POST', {
                     username,
                     pin
@@ -176,11 +234,13 @@ const Auth = (function() {
                 
                 if (result.success) {
                     storeAuthData(result.token, result.user);
+                    console.log('[Auth] Child login successful');
                     return { success: true, message: result.message };
                 }
                 
                 return { success: false, error: result.error };
             } catch (error) {
+                console.error('[Auth] Child login error:', error);
                 return { success: false, error: error.message };
             }
         },
@@ -247,21 +307,50 @@ const Auth = (function() {
         verifyToken,
         redirectIfAuthenticated,
         requireAuth,
-        clearAuthData
+        clearAuthData,
+        
+        // Expose request method for use by other modules
+        request: makeAuthRequest
     };
 })();
 
-// Automatically verify token on page load
-document.addEventListener('DOMContentLoaded', async () => {
-    // Skip verification on login and register pages
-    const currentPage = window.location.pathname;
-    const publicPages = [CONFIG.ROUTES.LOGIN, CONFIG.ROUTES.REGISTER, CONFIG.ROUTES.HOME, '/'];
+// Automatically verify token on page load - use immediate execution instead of DOMContentLoaded
+// This prevents conflicts with page-specific DOMContentLoaded handlers
+(function() {
+    // Ensure DOM is ready before checking authentication
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', verifyAuthOnLoad);
+    } else {
+        // DOM is already ready, execute immediately
+        verifyAuthOnLoad();
+    }
     
-    if (!publicPages.includes(currentPage) && Auth.isAuthenticated()) {
-        const isValid = await Auth.verifyToken();
-        if (!isValid) {
-            // Token is invalid, redirect to login
+    async function verifyAuthOnLoad() {
+        // Skip verification on public pages
+        const currentPage = window.location.pathname;
+        const publicPages = [CONFIG.ROUTES.LOGIN, CONFIG.ROUTES.REGISTER, CONFIG.ROUTES.HOME, '/', '/index.html', '/login.html', '/register.html'];
+        
+        // Check if current page is a public page
+        const isPublicPage = publicPages.some(page => currentPage.endsWith(page));
+        
+        if (isPublicPage) {
+            console.log('[Auth] Public page detected, skipping token verification');
+            return;
+        }
+        
+        // For protected pages, verify authentication
+        if (Auth.isAuthenticated()) {
+            console.log('[Auth] Protected page detected, verifying token...');
+            const isValid = await Auth.verifyToken();
+            if (!isValid) {
+                console.log('[Auth] Token invalid, redirecting to login');
+                window.location.href = CONFIG.ROUTES.LOGIN;
+            } else {
+                console.log('[Auth] Token verified successfully');
+            }
+        } else {
+            console.log('[Auth] No authentication found on protected page, redirecting to login');
             window.location.href = CONFIG.ROUTES.LOGIN;
         }
     }
-});
+})();

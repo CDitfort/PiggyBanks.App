@@ -1,22 +1,19 @@
 // Dashboard page functionality
 document.addEventListener('DOMContentLoaded', async () => {
-    // Require authentication
-    Auth.requireAuth();
+    console.log('[Dashboard] Initializing dashboard');
     
-    // Get user data
+    // Get user data - Auth module already verified token on page load
     const user = Auth.getUser();
     
     if (!user) {
+        console.log('[Dashboard] No user data found, redirecting to login');
         window.location.href = CONFIG.ROUTES.LOGIN;
         return;
     }
     
-    // Verify token is still valid
-    const isValid = await Auth.verifyToken();
-    if (!isValid) {
-        window.location.href = CONFIG.ROUTES.LOGIN;
-        return;
-    }
+    // Skip redundant token verification - auth.js already did this
+    // The auth module's automatic verification runs before DOMContentLoaded
+    console.log('[Dashboard] User authenticated:', user.username || user.email);
     
     // Display user information
     displayUserInfo(user);
