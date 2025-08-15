@@ -133,6 +133,9 @@ function setupAddChildForm() {
 
     if (!form) return;
 
+    // Setup real-time validation first
+    setupAddChildRealTimeValidation(form);
+
     form.addEventListener('submit', async (e) => {
         e.preventDefault();
 
@@ -141,9 +144,22 @@ function setupAddChildForm() {
         const pin = document.getElementById('childPinSetup').value.trim();
         const initialBalance = parseFloat(document.getElementById('initialBalance').value) || 0;
 
+        // Validate username
+        if (username.length < 4) {
+            alert('Username must be at least 4 characters');
+            return;
+        }
+
         // Validate PIN
         if (!/^[0-9]{4}$/.test(pin)) {
             alert('PIN must be exactly 4 digits');
+            return;
+        }
+        // No digit more than twice
+        const counts = {};
+        for (const ch of pin) counts[ch] = (counts[ch] || 0) + 1;
+        if (Object.values(counts).some(c => c > 2)) {
+            alert('PIN cannot contain any digit more than twice');
             return;
         }
 
@@ -180,6 +196,99 @@ function setupAddChildForm() {
 }
 
 /**
+ * Setup real-time validation for Add Child form
+ */
+function setupAddChildRealTimeValidation(form) {
+    // Real-time username availability check with debounce
+    const usernameInput = document.getElementById('childUsername');
+    const usernameHelp = document.getElementById('usernameHelp');
+    let usernameTimer;
+
+    // Real-time PIN validation for add child
+    const pinInput = document.getElementById('childPinSetup');
+    const pinHelp = document.getElementById('pinHelp');
+
+    function updateAddChildSubmitState() {
+        const submitButton = form.querySelector('button[type="submit"]');
+        const userOk = usernameInput?.dataset.valid === 'true';
+        const pinOk = pinInput?.dataset.valid === 'true';
+        // Name and balance basic checks
+        const nameOk = document.getElementById('childName').value.trim().length > 0;
+        const balOk = parseFloat(document.getElementById('initialBalance').value || '0') >= 0;
+        submitButton.disabled = !(userOk && pinOk && nameOk && balOk);
+    }
+
+    if (usernameInput && usernameHelp) {
+        usernameInput.addEventListener('input', () => {
+            clearTimeout(usernameTimer);
+            const val = usernameInput.value.trim().toLowerCase();
+            if (val.length < 4) {
+                usernameHelp.textContent = 'Username must be at least 4 characters';
+                usernameHelp.style.color = '#dc3545';
+                usernameInput.dataset.valid = 'false';
+                updateAddChildSubmitState();
+                return;
+            }
+            usernameHelp.textContent = 'Checking availability…';
+            usernameHelp.style.color = '#6c757d';
+            usernameTimer = setTimeout(async () => {
+                const current = usernameInput.value.trim().toLowerCase();
+                if (current !== val) return; // stale value, ignore
+                try {
+                    const res = await API.checkUsername(current);
+                    if (current !== usernameInput.value.trim().toLowerCase()) return; // still stale
+                    if (res.available) {
+                        usernameHelp.textContent = 'Username is available';
+                        usernameHelp.style.color = '#28a745';
+                        usernameInput.dataset.valid = 'true';
+                    } else {
+                        usernameHelp.textContent = res.message || 'Username is taken';
+                        usernameHelp.style.color = '#dc3545';
+                        usernameInput.dataset.valid = 'false';
+                    }
+                } catch (e) {
+                    usernameHelp.textContent = 'Unable to check availability';
+                    usernameHelp.style.color = '#dc3545';
+                    usernameInput.dataset.valid = 'false';
+                } finally {
+                    updateAddChildSubmitState();
+                }
+            }, 500);
+        });
+    }
+
+    if (pinInput && pinHelp) {
+        pinInput.addEventListener('input', () => {
+            const val = pinInput.value.trim();
+            let ok = /^\d{4}$/.test(val);
+            if (ok) {
+                const counts = {}; for (const ch of val) counts[ch] = (counts[ch] || 0) + 1;
+                ok = !Object.values(counts).some(c => c > 2);
+            }
+            pinInput.style.borderColor = ok ? '#28a745' : '#dc3545';
+            pinInput.dataset.valid = ok ? 'true' : 'false';
+
+            // Update help text
+            if (val.length === 0) {
+                pinHelp.textContent = 'Exactly 4 digits, no digit more than twice';
+                pinHelp.style.color = '#6c757d';
+            } else if (ok) {
+                pinHelp.textContent = 'PIN looks good';
+                pinHelp.style.color = '#28a745';
+            } else {
+                pinHelp.textContent = 'Invalid PIN - check requirements';
+                pinHelp.style.color = '#dc3545';
+            }
+
+            updateAddChildSubmitState();
+        });
+    }
+
+    // Initialize button state
+    updateAddChildSubmitState();
+}
+
+/**
  * Load children list for parent
  */
 async function loadChildrenList() {
@@ -209,25 +318,20 @@ async function loadChildrenList() {
                 childrenList.innerHTML = '<p class="no-data">No children added yet. Add your first child above!</p>';
             } else {
                 childrenList.innerHTML = result.children.map(child => `
-                    <div class="child-card sleek">
+                    <div class="child-card sleek vertical">
+                        <div class="card-header">
+                            <button class="settings-btn" onclick="openChildSettings('${child.id}','${child.name}','${child.username}')">⚙️</button>
+                        </div>
                         <div class="child-info">
-                            <div class="child-header">
-                                <h3>${child.name}</h3>
-                                <div class="credentials">
-                                    <span class="chip username">@${child.username}</span>
-                                    <button class="icon-btn" title="Copy username" onclick="copyToClipboard('${child.username}', 'Username copied!')">📋</button>
-                                </div>
+                            <h3 class="child-name" title="Name">${child.name}</h3>
+                            <div class="username-display" title="Username">@${child.username}</div>
+                            <div class="balance-display" title="Account Balance">
+                                <div class="balance-amount">$${(child.savings || 0).toFixed(2)}</div>
                             </div>
-                            <div class="balance">
-                                <span class="label">Balance</span>
-                                <span class="amount">$${(child.savings || 0).toFixed(2)}</span>
-                            </div>
-                            <div class="actions-row">
-                                <button class="btn btn-small btn-primary" onclick="addMoney('${child.id}', '${child.name}')">Add Money</button>
-                                <button class="btn btn-small btn-secondary" onclick="viewHistory('${child.id}')">History</button>
-                                <button class="btn btn-small btn-warning" onclick="promptChangePin('${child.id}', '${child.username}')">Change PIN</button>
-                                <button class="btn btn-small btn-danger" onclick="confirmDeleteChild('${child.id}', '${child.name}')">Delete</button>
-                            </div>
+                        </div>
+                        <div class="actions-column">
+                            <button class="btn btn-primary action-btn" onclick="addMoney('${child.id}', '${child.name}')">Add Money</button>
+                            <button class="btn btn-secondary action-btn" onclick="viewHistory('${child.id}')">History</button>
                         </div>
                     </div>
                 `).join('');
@@ -278,6 +382,30 @@ function setupParentModals() {
 
             addMoneyModal.style.display = 'none';
             addMoneyForm.reset();
+        });
+    }
+
+    // Setup Add Child Modal
+    const addChildBtn = document.getElementById('addChildBtn');
+    const addChildModal = document.getElementById('addChildModal');
+    const addChildClose = document.getElementById('addChildClose');
+
+    if (addChildBtn && addChildModal && addChildClose) {
+        // Open modal when + button is clicked
+        addChildBtn.addEventListener('click', () => {
+            addChildModal.style.display = 'flex';
+        });
+
+        // Close modal when X is clicked
+        addChildClose.addEventListener('click', () => {
+            addChildModal.style.display = 'none';
+        });
+
+        // Close modal when clicking outside (already handled above, but being explicit)
+        addChildModal.addEventListener('click', (e) => {
+            if (e.target === addChildModal) {
+                addChildModal.style.display = 'none';
+            }
         });
     }
 }
@@ -354,7 +482,7 @@ window.addMoney = function(childId, childName) {
         if (modalTitle) {
             modalTitle.textContent = `Add Money for ${childName}`;
         }
-        modal.style.display = 'block';
+        modal.style.display = 'flex';
     }
 };
 
@@ -402,34 +530,206 @@ window.confirmDeleteChild = async function(childId, name) {
 };
 // Add some basic styles for elements not in the original CSS
 const style = document.createElement('style');
+// Open settings modal with child details
+window.openChildSettings = function(childId, name, username) {
+    const modal = document.getElementById('childSettingsModal');
+    if (!modal) return;
+    document.getElementById('settingsChildId').value = childId;
+    document.getElementById('settingsChildName').textContent = name;
+    document.getElementById('settingsChildUsername').textContent = `@${username}`;
+    modal.style.display = 'flex';
+
+    // Setup real-time PIN validation when modal opens
+    setupResetPinValidation();
+};
+
+// Wire up modal close and forms once on load
+(function setupChildSettingsModal(){
+    const modal = document.getElementById('childSettingsModal');
+    if (!modal) return;
+    const closeBtn = document.getElementById('childSettingsClose');
+    closeBtn?.addEventListener('click', ()=> modal.style.display='none');
+    window.addEventListener('click', (e)=>{ if (e.target === modal) modal.style.display='none'; });
+
+    // Reset PIN form with double confirm
+    const resetForm = document.getElementById('resetPinForm');
+    resetForm?.addEventListener('submit', async (e)=>{
+        e.preventDefault();
+        const childId = document.getElementById('settingsChildId').value;
+        const newPin = document.getElementById('newPin').value.trim();
+        const confirmPin = document.getElementById('confirmNewPin').value.trim();
+        if (!/^\d{4}$/.test(newPin)) { alert('PIN must be exactly 4 digits'); return; }
+        // No digit more than twice
+        const counts = {}; for (const ch of newPin) counts[ch] = (counts[ch] || 0) + 1;
+        if (Object.values(counts).some(c => c > 2)) { alert('PIN cannot contain any digit more than twice'); return; }
+        if (newPin !== confirmPin) { alert('PINs do not match'); return; }
+        if (!confirm('Are you sure you want to reset this PIN?')) return;
+        const second = prompt('Type RESET to confirm');
+        if (second !== 'RESET') { alert('PIN reset cancelled'); return; }
+        try {
+            await API.updateChildPin(childId, newPin);
+            alert('PIN has been reset.');
+            modal.style.display = 'none';
+            resetForm.reset();
+        } catch (err) {
+            alert(err.message || 'Failed to reset PIN');
+        }
+    });
+
+    // Delete child with double confirm
+    const deleteBtn = document.getElementById('deleteChildBtn');
+    deleteBtn?.addEventListener('click', async ()=>{
+        const childId = document.getElementById('settingsChildId').value;
+        const name = document.getElementById('settingsChildName').textContent;
+        if (!confirm(`Delete ${name}? This cannot be undone.`)) return;
+        const second = prompt('Type DELETE to confirm');
+        if (second !== 'DELETE') { alert('Deletion cancelled'); return; }
+        try {
+            await API.deleteChild(childId);
+            alert('Child deleted');
+            modal.style.display = 'none';
+            await loadChildrenList();
+        } catch (err) {
+            alert(err.message || 'Failed to delete child');
+        }
+    });
+})();
 style.textContent = `
-    .child-card.sleek {
+    .child-card.sleek.vertical {
         background: white;
-        border: 1px solid var(--neutral-200);
-        border-radius: var(--radius-xl);
-        box-shadow: var(--shadow-md);
+        border: 2px solid var(--neutral-500);
+        border-radius: 12px;
         padding: 16px;
-        transition: transform 0.2s ease, box-shadow 0.2s ease;
+        transition: all 0.2s ease;
+        display: flex;
+        flex-direction: column;
+        min-height: 160px;
+        position: relative;
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+        backdrop-filter: blur(10px);
+        cursor: default;
     }
-    .child-card.sleek:hover {
+    .child-card.sleek.vertical:hover {
         transform: translateY(-2px);
-        box-shadow: var(--shadow-lg);
+        box-shadow: 0 8px 25px rgba(0, 0, 0, 0.15);
+        backdrop-filter: blur(15px);
+        border-color: var(--neutral-600);
     }
-    .child-card .child-header {
-        display: flex; justify-content: space-between; align-items: center; gap: 8px;
+    .child-card .card-header {
+        display: flex;
+        justify-content: flex-end;
+        margin-bottom: 4px;
     }
-    .child-card .credentials { display: inline-flex; align-items: center; gap: 6px; }
-    .chip.username {
-        background: var(--neutral-100); color: var(--neutral-700);
-        border: 1px solid var(--neutral-300);
-        padding: 2px 8px; border-radius: 999px; font-size: 12px;
+    .child-card .settings-btn {
+        background: transparent;
+        border: none;
+        width: 24px;
+        height: 24px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        cursor: pointer;
+        font-size: 16px;
+        color: var(--neutral-400);
+        transition: color 0.2s ease;
     }
-    .icon-btn { background: transparent; border: none; cursor: pointer; }
-    .child-card .balance { display: flex; justify-content: space-between; margin: 12px 0; }
-    .child-card .amount { font-weight: 700; color: var(--primary-700); }
-    .child-card .actions-row { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; }
-    .btn.btn-small.btn-warning { background: #f59e0b; color: white; }
-    .btn.btn-small.btn-danger { background: #ef4444; color: white; }
+    .child-card .settings-btn:hover {
+        color: var(--neutral-600);
+    }
+    .child-card .child-info {
+        text-align: center;
+        flex: 1;
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+        gap: 2px;
+    }
+    .child-card .child-name {
+        font-size: 18px;
+        font-weight: 600;
+        color: var(--neutral-900);
+        margin: 0;
+    }
+    .child-card .username-display {
+        color: var(--neutral-500);
+        font-size: 13px;
+        margin-bottom: 8px;
+    }
+    .child-card .balance-display {
+        margin-bottom: 16px;
+        background: transparent !important;
+        background-image: none !important;
+    }
+    .child-card .balance-amount {
+        font-size: 20px;
+        font-weight: 700;
+        color: var(--neutral-800);
+        background: transparent !important;
+        background-image: none !important;
+    }
+    .child-card .actions-column {
+        display: flex;
+        flex-direction: column;
+        gap: 6px;
+    }
+    .child-card .action-btn {
+        width: 100%;
+        padding: 8px 12px;
+        font-size: 13px;
+        font-weight: 500;
+        border-radius: 6px;
+        transition: all 0.2s ease;
+        border: 1px solid transparent;
+        cursor: pointer;
+    }
+    .child-card .action-btn.btn-primary {
+        background: var(--primary-600);
+        color: white;
+        border-color: var(--primary-600);
+    }
+    .child-card .action-btn.btn-primary:hover {
+        background: var(--primary-700);
+        border-color: var(--primary-700);
+    }
+    .child-card .action-btn.btn-secondary {
+        background: transparent;
+        color: var(--neutral-600);
+        border-color: var(--neutral-300);
+    }
+    .child-card .action-btn.btn-secondary:hover {
+        background: var(--neutral-50);
+        color: var(--neutral-700);
+    }
+    .section-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 24px;
+    }
+    .add-child-btn {
+        background: var(--primary-600);
+        color: white;
+        border: none;
+        border-radius: 50%;
+        width: 48px;
+        height: 48px;
+        font-size: 24px;
+        font-weight: 300;
+        cursor: pointer;
+        transition: all 0.2s ease;
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+    }
+    .add-child-btn:hover {
+        background: var(--primary-700);
+        transform: scale(1.05);
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+    }
+    .children-cards {
+        margin-top: 16px;
+    }
 `;
 
 document.head.appendChild(style);

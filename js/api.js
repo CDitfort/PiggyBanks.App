@@ -78,6 +78,12 @@ const API = (function() {
         async updateChildPin(childId, pin) {
             return request(`/children/${childId}/pin`, 'PUT', { pin });
         },
+
+        // Username availability check
+        async checkUsername(username) {
+            const q = encodeURIComponent(username);
+            return request(`/usernames/check?username=${q}`);
+        },
         
         // Goals endpoints (for future implementation)
         async createGoal(childId, name, targetAmount, deadline) {

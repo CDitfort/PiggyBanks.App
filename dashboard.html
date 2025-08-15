@@ -41,37 +41,12 @@
                         </div>
                     </section>
 
-                    <!-- Add Child Section -->
-                    <section class="dashboard-section">
-                        <h2>Add New Child</h2>
-                        <form id="addChildForm" class="add-child-form">
-                            <div class="form-row">
-                                <div class="form-group">
-                                    <label for="childName">Child's Name</label>
-                                    <input type="text" id="childName" required placeholder="Enter child's name">
-                                </div>
-                                <div class="form-group">
-                                    <label for="childUsername">Username</label>
-                                    <input type="text" id="childUsername" required placeholder="Choose username">
-                                </div>
-                            </div>
-                            <div class="form-row">
-                                <div class="form-group">
-                                    <label for="childPinSetup">4-Digit PIN</label>
-                                    <input type="text" id="childPinSetup" required maxlength="4" pattern="[0-9]{4}" placeholder="0000">
-                                </div>
-                                <div class="form-group">
-                                    <label for="initialBalance">Initial Balance</label>
-                                    <input type="number" id="initialBalance" min="0" step="0.01" value="0" placeholder="0.00">
-                                </div>
-                            </div>
-                            <button type="submit" class="btn btn-primary">Add Child</button>
-                        </form>
-                    </section>
-
                     <!-- Children List Section -->
                     <section class="dashboard-section children-list">
-                        <h2>Your Children</h2>
+                        <div class="section-header">
+                            <h2>Your Children</h2>
+                            <button id="addChildBtn" class="add-child-btn" title="Add New Child">+</button>
+                        </div>
                         <div id="childrenList" class="children-cards">
                             <!-- Children cards will be populated here -->
                         </div>
@@ -104,6 +79,87 @@
                             </form>
                         </div>
                     </div>
+
+                        <!-- Child Settings Modal -->
+                        <div id="childSettingsModal" class="modal" style="display: none;">
+                            <div class="modal-content">
+                                <span class="close" id="childSettingsClose">&times;</span>
+                                <h2>Child Settings</h2>
+                                <div class="form-group">
+                                    <label>Child</label>
+                                    <div id="settingsChildName" style="font-weight:600"></div>
+                                    <div id="settingsChildUsername" class="username" style="color:#6c757d"></div>
+                                </div>
+                                <hr>
+                                <div class="form-group">
+                                    <label>PIN</label>
+                                    <p style="margin:0 0 8px 0;color:#6c757d">Current PIN is not displayed for security. Use Reset PIN.</p>
+                                    <form id="resetPinForm">
+                                        <input type="hidden" id="settingsChildId">
+                                        <div class="form-row">
+                                            <div class="form-group">
+                                                <label for="newPin">New 4-Digit PIN</label>
+                                                <input type="text" id="newPin" maxlength="4" pattern="[0-9]{4}" required placeholder="0000">
+                                                <div id="newPinHelp" class="help-text" style="font-size:12px;color:#6c757d;margin-top:4px">Exactly 4 digits, no digit more than twice</div>
+                                            </div>
+                                            <div class="form-group">
+                                                <label for="confirmNewPin">Confirm New PIN</label>
+                                                <input type="text" id="confirmNewPin" maxlength="4" pattern="[0-9]{4}" required placeholder="0000">
+                                                <div id="confirmPinHelp" class="help-text" style="font-size:12px;color:#6c757d;margin-top:4px">Must match the PIN above</div>
+                                            </div>
+                                        </div>
+                                        <button type="submit" class="btn btn-primary">Reset PIN</button>
+                                    </form>
+                                </div>
+                                <hr>
+                                <div class="form-group">
+                                    <label>Danger Zone</label>
+                                    <p style="margin:0 0 8px 0;color:#dc3545">Deleting a child account is permanent.</p>
+                                    <button id="deleteChildBtn" class="btn btn-secondary" style="background:#ef4444;color:#fff">Delete Child Account</button>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Add Child Modal (moved under parent dashboard) -->
+                        <div id="addChildModal" class="modal" style="display: none;">
+                            <div class="modal-content">
+                                <span class="close" id="addChildClose">&times;</span>
+                                <h2>Add New Child</h2>
+                                <form id="addChildForm" class="add-child-form">
+                                    <div class="form-row">
+                                        <div class="form-group">
+                                            <label for="childName">Child's Name</label>
+                                            <input type="text" id="childName" required placeholder="Enter child's name">
+                                        </div>
+                                        <div class="form-group">
+                                            <label for="childUsername">Username</label>
+                                            <input type="text" id="childUsername" required placeholder="Choose username">
+                                            <div id="usernameHelp" class="help-text" style="font-size:12px;color:#6c757d;margin-top:4px">Must be at least 4 characters and unique.</div>
+                                        </div>
+                                    </div>
+                                    <div class="form-row">
+                                        <div class="form-group">
+                                            <label for="childPinSetup">4-Digit PIN</label>
+                                            <input type="text" id="childPinSetup" required maxlength="4" pattern="[0-9]{4}" placeholder="0000">
+                                            <div id="pinHelp" class="help-text" style="font-size:12px;color:#6c757d;margin-top:4px">Exactly 4 digits, no digit more than twice</div>
+                                        </div>
+                                        <div class="form-group">
+                                            <label>PIN Requirements</label>
+                                            <ul style="margin:4px 0 0 16px;padding:0;font-size:12px;color:#6c757d">
+                                                <li>Exactly 4 digits</li>
+                                                <li>No single digit appears more than twice</li>
+                                            </ul>
+                                        </div>
+                                        <div class="form-group">
+                                            <label for="initialBalance">Initial Balance</label>
+                                            <input type="number" id="initialBalance" min="0" step="0.01" value="0" placeholder="0.00">
+                                        </div>
+                                    </div>
+
+                                    <button type="submit" class="btn btn-primary">Add Child</button>
+                                </form>
+                            </div>
+                        </div>
                 </div>
             </div>
 
@@ -119,6 +175,7 @@
                                 <span class="currency">$</span>
                                 <span id="childBalance">0.00</span>
                             </div>
+
                         </div>
                     </section>
 
