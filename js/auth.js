@@ -265,18 +265,19 @@ const Auth = (function() {
         /**
          * Create a child account (parent only)
          */
-        async createChild(name, username, pin) {
+        async createChild(name, username, pin, initialBalance = 0) {
             try {
                 const result = await makeAuthRequest('/create-child', 'POST', {
                     name,
                     username,
-                    pin
+                    pin,
+                    initialBalance
                 });
-                
+
                 if (result.success) {
                     return { success: true, child: result.child };
                 }
-                
+
                 return { success: false, error: result.error };
             } catch (error) {
                 return { success: false, error: error.message };

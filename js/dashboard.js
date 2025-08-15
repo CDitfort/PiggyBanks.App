@@ -107,10 +107,12 @@ async function loadChildDashboard() {
         childDashboard.style.display = 'block';
     }
     
-    // Display balance (default to 0 for now)
+    // Display child's actual balance from user data
     const balanceElement = document.getElementById('childBalance');
     if (balanceElement) {
-        balanceElement.textContent = '0.00';
+        const user = Auth.getUser();
+        const balance = (user && typeof user.savings === 'number') ? user.savings : 0;
+        balanceElement.textContent = balance.toFixed(2);
     }
     
     // Setup child actions
@@ -133,28 +135,35 @@ function setupAddChildForm() {
     
     form.addEventListener('submit', async (e) => {
         e.preventDefault();
-        
+
         const name = document.getElementById('childName').value.trim();
         const username = document.getElementById('childUsername').value.trim().toLowerCase();
         const pin = document.getElementById('childPinSetup').value.trim();
-        
+        const initialBalance = parseFloat(document.getElementById('initialBalance').value) || 0;
+
         // Validate PIN
         if (!/^[0-9]{4}$/.test(pin)) {
             alert('PIN must be exactly 4 digits');
             return;
         }
-        
+
+        // Validate initial balance
+        if (initialBalance < 0) {
+            alert('Initial balance cannot be negative');
+            return;
+        }
+
         // Disable form during submission
         const submitButton = form.querySelector('button[type="submit"]');
         const originalText = submitButton.textContent;
         submitButton.disabled = true;
         submitButton.textContent = 'Creating...';
-        
+
         try {
-            const result = await Auth.createChild(name, username, pin);
-            
+            const result = await Auth.createChild(name, username, pin, initialBalance);
+
             if (result.success) {
-                alert(`Child account created successfully!\nUsername: ${username}\nPIN: ${pin}\n\nPlease save these credentials.`);
+                alert(`Child account created successfully!\nUsername: ${username}\nPIN: ${pin}\nInitial Balance: $${initialBalance.toFixed(2)}\n\nPlease save these credentials.`);
                 form.reset();
                 await loadChildrenList();
             } else {
