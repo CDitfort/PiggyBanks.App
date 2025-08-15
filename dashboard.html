@@ -1,0 +1,218 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dashboard - Piggybanks.app</title>
+    <link rel="stylesheet" href="css/styles.css">
+</head>
+<body>
+    <div class="container">
+        <header class="dashboard-header">
+            <div class="logo">
+                <h1>🐷 Piggybanks.app</h1>
+            </div>
+            <div class="user-info">
+                <span id="userName"></span>
+                <button id="logoutBtn" class="btn btn-secondary">Logout</button>
+            </div>
+        </header>
+
+        <main class="dashboard-container">
+            <!-- Parent Dashboard -->
+            <div id="parentDashboard" class="dashboard-content" style="display: none;">
+                <div class="dashboard-grid">
+                    <!-- Overview Section -->
+                    <section class="dashboard-section overview">
+                        <h2>Family Overview</h2>
+                        <div class="stats-grid">
+                            <div class="stat-card">
+                                <h3>Total Children</h3>
+                                <p class="stat-value" id="totalChildren">0</p>
+                            </div>
+                            <div class="stat-card">
+                                <h3>Total Balance</h3>
+                                <p class="stat-value">$<span id="totalBalance">0.00</span></p>
+                            </div>
+                            <div class="stat-card">
+                                <h3>Pending Requests</h3>
+                                <p class="stat-value" id="pendingRequests">0</p>
+                            </div>
+                        </div>
+                    </section>
+
+                    <!-- Add Child Section -->
+                    <section class="dashboard-section">
+                        <h2>Add New Child</h2>
+                        <form id="addChildForm" class="add-child-form">
+                            <div class="form-row">
+                                <div class="form-group">
+                                    <label for="childName">Child's Name</label>
+                                    <input type="text" id="childName" required placeholder="Enter child's name">
+                                </div>
+                                <div class="form-group">
+                                    <label for="childUsername">Username</label>
+                                    <input type="text" id="childUsername" required placeholder="Choose username">
+                                </div>
+                            </div>
+                            <div class="form-row">
+                                <div class="form-group">
+                                    <label for="childPinSetup">4-Digit PIN</label>
+                                    <input type="text" id="childPinSetup" required maxlength="4" pattern="[0-9]{4}" placeholder="0000">
+                                </div>
+                                <div class="form-group">
+                                    <label for="initialBalance">Initial Balance</label>
+                                    <input type="number" id="initialBalance" min="0" step="0.01" value="0" placeholder="0.00">
+                                </div>
+                            </div>
+                            <button type="submit" class="btn btn-primary">Add Child</button>
+                        </form>
+                    </section>
+
+                    <!-- Children List Section -->
+                    <section class="dashboard-section children-list">
+                        <h2>Your Children</h2>
+                        <div id="childrenList" class="children-cards">
+                            <!-- Children cards will be populated here -->
+                        </div>
+                    </section>
+
+                    <!-- Pending Approvals Section -->
+                    <section class="dashboard-section approvals">
+                        <h2>Pending Approvals</h2>
+                        <div id="approvalsList" class="approvals-list">
+                            <!-- Pending approvals will be populated here -->
+                        </div>
+                    </section>
+
+                    <!-- Add Money Modal -->
+                    <div id="addMoneyModal" class="modal" style="display: none;">
+                        <div class="modal-content">
+                            <span class="close">&times;</span>
+                            <h2>Add Money for Chore</h2>
+                            <form id="addMoneyForm">
+                                <input type="hidden" id="addMoneyChildId">
+                                <div class="form-group">
+                                    <label for="choreAmount">Amount</label>
+                                    <input type="number" id="choreAmount" min="0.01" step="0.01" required placeholder="0.00">
+                                </div>
+                                <div class="form-group">
+                                    <label for="choreDescription">Description</label>
+                                    <textarea id="choreDescription" required placeholder="What chore was completed?"></textarea>
+                                </div>
+                                <button type="submit" class="btn btn-primary">Add Money</button>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Child Dashboard -->
+            <div id="childDashboard" class="dashboard-content" style="display: none;">
+                <div class="child-dashboard-grid">
+                    <!-- Balance Section -->
+                    <section class="dashboard-section balance-section">
+                        <h2>My Piggy Bank</h2>
+                        <div class="balance-display">
+                            <div class="piggy-icon">🐷</div>
+                            <div class="balance-amount">
+                                <span class="currency">$</span>
+                                <span id="childBalance">0.00</span>
+                            </div>
+                        </div>
+                    </section>
+
+                    <!-- Quick Actions -->
+                    <section class="dashboard-section quick-actions">
+                        <h2>What would you like to do?</h2>
+                        <div class="action-buttons">
+                            <button id="requestWithdrawalBtn" class="action-btn">
+                                <span class="action-icon">💵</span>
+                                <span>Request Money</span>
+                            </button>
+                            <button id="transferMoneyBtn" class="action-btn">
+                                <span class="action-icon">🔄</span>
+                                <span>Transfer to Sibling</span>
+                            </button>
+                        </div>
+                    </section>
+
+                    <!-- Transaction History -->
+                    <section class="dashboard-section transactions">
+                        <h2>My Transaction History</h2>
+                        <div id="childTransactionList" class="transaction-list">
+                            <!-- Transactions will be populated here -->
+                        </div>
+                    </section>
+
+                    <!-- Request Withdrawal Modal -->
+                    <div id="withdrawalModal" class="modal" style="display: none;">
+                        <div class="modal-content">
+                            <span class="close">&times;</span>
+                            <h2>Request Withdrawal</h2>
+                            <form id="withdrawalForm">
+                                <div class="form-group">
+                                    <label for="withdrawAmount">Amount</label>
+                                    <input type="number" id="withdrawAmount" min="0.01" step="0.01" required placeholder="0.00">
+                                </div>
+                                <div class="form-group">
+                                    <label for="withdrawReason">What for?</label>
+                                    <textarea id="withdrawReason" required placeholder="Tell your parent what you want to buy"></textarea>
+                                </div>
+                                <button type="submit" class="btn btn-primary">Send Request</button>
+                            </form>
+                        </div>
+                    </div>
+
+                    <!-- Transfer Modal -->
+                    <div id="transferModal" class="modal" style="display: none;">
+                        <div class="modal-content">
+                            <span class="close">&times;</span>
+                            <h2>Transfer to Sibling</h2>
+                            <form id="transferForm">
+                                <div class="form-group">
+                                    <label for="siblingSelect">Choose Sibling</label>
+                                    <select id="siblingSelect" required>
+                                        <option value="">Select a sibling</option>
+                                        <!-- Siblings will be populated here -->
+                                    </select>
+                                </div>
+                                <div class="form-group">
+                                    <label for="transferAmount">Amount</label>
+                                    <input type="number" id="transferAmount" min="0.01" step="0.01" required placeholder="0.00">
+                                </div>
+                                <div class="form-group">
+                                    <label for="transferReason">Reason</label>
+                                    <textarea id="transferReason" required placeholder="Why are you sending money?"></textarea>
+                                </div>
+                                <button type="submit" class="btn btn-primary">Send Transfer Request</button>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Loading State -->
+            <div id="loadingState" class="loading-state">
+                <div class="spinner"></div>
+                <p>Loading your dashboard...</p>
+            </div>
+
+            <!-- Error State -->
+            <div id="errorState" class="error-state" style="display: none;">
+                <p>Something went wrong. Please try refreshing the page.</p>
+                <button onclick="location.reload()" class="btn btn-primary">Refresh</button>
+            </div>
+        </main>
+
+        <footer>
+            <p>&copy; 2024 Piggybanks.app. All rights reserved.</p>
+        </footer>
+    </div>
+
+    <script src="js/config.js"></script>
+    <script src="js/auth.js"></script>
+    <script src="js/api.js"></script>
+    <script src="js/dashboard.js"></script>
+</body>
+</html>

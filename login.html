@@ -1,0 +1,100 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Login - Piggybanks.app</title>
+    <link rel="stylesheet" href="css/styles.css">
+</head>
+<body>
+    <header>
+        <div class="container">
+            <div class="header-card">
+                <div class="logo">
+                    <a href="index.html">
+                        <h1>🐷 Piggybanks.app</h1>
+                    </a>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <div class="container">
+
+        <main class="auth-container">
+            <div class="auth-card">
+                <h2>Welcome Back!</h2>
+                
+                <!-- Login Type Selector -->
+                <div class="login-type-selector">
+                    <button type="button" class="login-type-btn active" data-type="parent">
+                        <span class="icon">👨‍👩‍👧‍👦</span>
+                        <span>Parent Login</span>
+                    </button>
+                    <button type="button" class="login-type-btn" data-type="child">
+                        <span class="icon">👶</span>
+                        <span>Child Login</span>
+                    </button>
+                </div>
+
+                <!-- Parent Login Form -->
+                <form id="parentLoginForm" class="auth-form">
+                    <div class="form-group">
+                        <label for="parentEmail">Email Address</label>
+                        <input type="email" id="parentEmail" name="email" required placeholder="Enter your email">
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="parentPassword">Password</label>
+                        <input type="password" id="parentPassword" name="password" required placeholder="Enter your password">
+                    </div>
+                    
+                    <div class="form-group">
+                        <a href="#" class="forgot-password">Forgot password?</a>
+                    </div>
+                    
+                    <div class="error-message" id="parentErrorMessage"></div>
+                    
+                    <button type="submit" class="btn btn-primary btn-block">Login as Parent</button>
+                </form>
+
+                <!-- Child Login Form -->
+                <form id="childLoginForm" class="auth-form" style="display: none;">
+                    <div class="form-group">
+                        <label for="childUsername">Username</label>
+                        <input type="text" id="childUsername" name="username" required placeholder="Enter your username">
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="childPin">PIN</label>
+                        <div class="pin-input-container">
+                            <input type="text" class="pin-input" maxlength="1" pattern="[0-9]" inputmode="numeric">
+                            <input type="text" class="pin-input" maxlength="1" pattern="[0-9]" inputmode="numeric">
+                            <input type="text" class="pin-input" maxlength="1" pattern="[0-9]" inputmode="numeric">
+                            <input type="text" class="pin-input" maxlength="1" pattern="[0-9]" inputmode="numeric">
+                        </div>
+                        <input type="hidden" id="childPin" name="pin">
+                    </div>
+                    
+                    <div class="error-message" id="childErrorMessage"></div>
+                    
+                    <button type="submit" class="btn btn-primary btn-block">Login as Child</button>
+                </form>
+                
+                <div class="auth-footer">
+                    <p id="parentFooter">Don't have an account? <a href="register.html">Sign up here</a></p>
+                    <p id="childFooter" style="display: none;">Ask your parent to create an account for you!</p>
+                </div>
+            </div>
+        </main>
+
+        <footer>
+            <p>&copy; 2024 Piggybanks.app. All rights reserved.</p>
+        </footer>
+    </div>
+
+    <script src="js/config.js"></script>
+    <script src="js/auth.js"></script>
+    <script src="js/login.js"></script>
+</body>
+</html>
