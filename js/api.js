@@ -61,6 +61,26 @@ const API = (function() {
         async rejectTransferRequest(requestId, reason) {
             return request(`/transfers/${requestId}/reject`, 'POST', { reason });
         },
+
+        // Money addition request endpoints
+        async createMoneyAdditionRequest(amount, reason) {
+            return request('/money-addition-requests', 'POST', {
+                amount,
+                reason
+            });
+        },
+
+        async getMoneyAdditionRequests() {
+            return request('/money-addition-requests');
+        },
+
+        async approveMoneyAdditionRequest(requestId) {
+            return request(`/money-addition-requests/${requestId}/approve`, 'POST');
+        },
+
+        async rejectMoneyAdditionRequest(requestId, reason) {
+            return request(`/money-addition-requests/${requestId}/reject`, 'POST', { reason });
+        },
         
         // Child management
         async updateChildBalance(childId, amount) {

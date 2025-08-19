@@ -50,6 +50,7 @@
                         <div id="childrenList" class="children-cards">
                             <!-- Children cards will be populated here -->
                         </div>
+                        <div id="childrenPagination" class="pagination"></div>
                     </section>
 
                     <!-- Pending Approvals Section -->
@@ -58,6 +59,7 @@
                         <div id="approvalsList" class="approvals-list">
                             <!-- Pending approvals will be populated here -->
                         </div>
+                        <div id="approvalsPagination" class="pagination"></div>
                     </section>
 
                     <!-- Add Money Modal -->
@@ -80,42 +82,97 @@
                         </div>
                     </div>
 
+
+                    <!-- Remove Money Modal -->
+                    <div id="removeMoneyModal" class="modal" style="display: none;">
+                        <div class="modal-content">
+                            <span class="close">&times;</span>
+                            <h2>Remove Money</h2>
+                            <form id="removeMoneyForm">
+                                <input type="hidden" id="removeMoneyChildId">
+                                <div class="form-group">
+                                    <label for="removeAmount">Amount</label>
+                                    <input type="number" id="removeAmount" min="0.01" step="0.01" required placeholder="0.00">
+                                </div>
+                                <div class="form-group">
+                                    <label for="removeReason">Reason</label>
+                                    <textarea id="removeReason" required placeholder="Why are you removing money?"></textarea>
+                                </div>
+                                <button type="submit" class="btn btn-secondary">Remove Money</button>
+                            </form>
+                        </div>
+                    </div>
+
                         <!-- Child Settings Modal -->
                         <div id="childSettingsModal" class="modal" style="display: none;">
-                            <div class="modal-content">
+                            <div class="modal-content child-settings-modal">
                                 <span class="close" id="childSettingsClose">&times;</span>
                                 <h2>Child Settings</h2>
-                                <div class="form-group">
-                                    <label>Child</label>
-                                    <div id="settingsChildName" style="font-weight:600"></div>
-                                    <div id="settingsChildUsername" class="username" style="color:#6c757d"></div>
-                                </div>
-                                <hr>
-                                <div class="form-group">
-                                    <label>PIN</label>
-                                    <p style="margin:0 0 8px 0;color:#6c757d">Current PIN is not displayed for security. Use Reset PIN.</p>
-                                    <form id="resetPinForm">
-                                        <input type="hidden" id="settingsChildId">
-                                        <div class="form-row">
-                                            <div class="form-group">
-                                                <label for="newPin">New 4-Digit PIN</label>
-                                                <input type="text" id="newPin" maxlength="4" pattern="[0-9]{4}" required placeholder="0000">
-                                                <div id="newPinHelp" class="help-text" style="font-size:12px;color:#6c757d;margin-top:4px">Exactly 4 digits, no digit more than twice</div>
-                                            </div>
-                                            <div class="form-group">
-                                                <label for="confirmNewPin">Confirm New PIN</label>
-                                                <input type="text" id="confirmNewPin" maxlength="4" pattern="[0-9]{4}" required placeholder="0000">
-                                                <div id="confirmPinHelp" class="help-text" style="font-size:12px;color:#6c757d;margin-top:4px">Must match the PIN above</div>
-                                            </div>
+
+                                <!-- Section 1: Account Information -->
+                                <div class="settings-section">
+                                    <h3 class="section-heading">Account Information:</h3>
+                                    <div class="child-info-section">
+                                        <div class="info-row">
+                                            <span class="info-label">Name:</span>
+                                            <span id="settingsChildName" class="info-value"></span>
                                         </div>
-                                        <button type="submit" class="btn btn-primary">Reset PIN</button>
-                                    </form>
+                                        <div class="info-row">
+                                            <span class="info-label">Username:</span>
+                                            <span id="settingsChildUsername" class="info-value"></span>
+                                        </div>
+                                        <div class="info-row">
+                                            <span class="info-label">Access Pin:</span>
+                                            <span class="info-value pin-display">••••</span>
+                                        </div>
+                                        <p class="security-message" style="font-size: 11px !important; font-style: italic !important; margin: 0 0 10px 0 !important; color: #64748b !important;">PIN hidden for security. If forgotten, reset below.</p>
+                                    </div>
                                 </div>
-                                <hr>
-                                <div class="form-group">
-                                    <label>Danger Zone</label>
-                                    <p style="margin:0 0 8px 0;color:#dc3545">Deleting a child account is permanent.</p>
-                                    <button id="deleteChildBtn" class="btn btn-secondary" style="background:#ef4444;color:#fff">Delete Child Account</button>
+
+                                <!-- Section 2: Reset PIN (Collapsible) -->
+                                <div class="settings-section collapsible-section" style="margin-bottom: 24px; background: white; border: 1px solid #e2e8f0; border-radius: 16px; overflow: hidden; box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);">
+                                    <button class="section-toggle" type="button" onclick="toggleSection('pinResetSection')" style="width: 100%; background: #f8fafc; border: none; padding: 20px 24px; display: flex; justify-content: space-between; align-items: center; cursor: pointer; transition: all 0.2s ease; text-align: left;">
+                                        <h3 class="section-heading" style="font-size: 18px; font-weight: 600; color: #1f2937; margin: 0; letter-spacing: -0.025em;">Reset PIN</h3>
+                                        <svg class="toggle-arrow" id="pinResetArrow" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="color: #6b7280; transition: all 0.25s ease; flex-shrink: 0; margin-left: 12px; opacity: 0.7;">
+                                            <polyline points="6,9 12,15 18,9"></polyline>
+                                        </svg>
+                                    </button>
+                                    <div class="section-content" id="pinResetSection" style="display: none; padding: 20px !important; background: white; border-top: 1px solid #f1f5f9; margin: 0;">
+                                        <div class="pin-reset-section" style="margin: 0 !important; padding: 0 !important;">
+                                            <form id="resetPinForm" style="margin: 0 !important;">
+                                                <input type="hidden" id="settingsChildId">
+                                                <div class="form-row" style="margin-bottom: 20px !important; gap: 16px !important;">
+                                                    <div class="form-group" style="margin-bottom: 20px !important;">
+                                                        <label for="newPin" style="margin-bottom: 8px !important;">New 4-Digit PIN</label>
+                                                        <input type="text" id="newPin" maxlength="4" pattern="[0-9]{4}" required placeholder="0000" style="margin-bottom: 4px !important;">
+                                                        <div id="newPinHelp" class="help-text" style="margin-top: 4px !important;">Exactly 4 digits, no digit more than twice</div>
+                                                    </div>
+                                                    <div class="form-group" style="margin-bottom: 20px !important;">
+                                                        <label for="confirmNewPin" style="margin-bottom: 8px !important;">Confirm New PIN</label>
+                                                        <input type="text" id="confirmNewPin" maxlength="4" pattern="[0-9]{4}" required placeholder="0000" style="margin-bottom: 4px !important;">
+                                                        <div id="confirmPinHelp" class="help-text" style="margin-top: 4px !important;">Must match the PIN above</div>
+                                                    </div>
+                                                </div>
+                                                <button type="submit" class="btn btn-primary" style="background: #0284c7 !important; color: white !important; border: 1px solid #0369a1 !important; padding: 12px 24px !important; border-radius: 8px !important; font-weight: 600 !important; cursor: pointer !important; transition: all 0.2s ease !important; display: inline-block !important; width: 180px !important; font-size: 14px !important; text-align: center !important; box-sizing: border-box !important;">Reset PIN</button>
+                                            </form>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <!-- Section 3: Delete Account (Collapsible) -->
+                                <div class="settings-section collapsible-section" style="margin-bottom: 24px; background: white; border: 1px solid #e2e8f0; border-radius: 16px; overflow: hidden; box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);">
+                                    <button class="section-toggle" type="button" onclick="toggleSection('deleteSection')" style="width: 100%; background: #f8fafc; border: none; padding: 20px 24px; display: flex; justify-content: space-between; align-items: center; cursor: pointer; transition: all 0.2s ease; text-align: left;">
+                                        <h3 class="section-heading danger-heading" style="font-size: 18px; font-weight: 600; color: #dc2626; margin: 0; letter-spacing: -0.025em;">Delete Account</h3>
+                                        <svg class="toggle-arrow" id="deleteSectionArrow" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="color: #6b7280; transition: all 0.25s ease; flex-shrink: 0; margin-left: 12px; opacity: 0.7;">
+                                            <polyline points="6,9 12,15 18,9"></polyline>
+                                        </svg>
+                                    </button>
+                                    <div class="section-content" id="deleteSection" style="display: none; padding: 20px !important; background: white; border-top: 1px solid #f1f5f9; margin: 0;">
+                                        <div class="danger-zone-section" style="padding: 0 !important; margin: 0 !important;">
+                                            <p class="danger-warning" style="margin: 0 0 20px 0 !important; font-size: 14px !important; color: #dc2626 !important; line-height: 1.4 !important;"><strong>*Danger</strong> - Deleting a child account is permanent and cannot be undone.</p>
+                                            <button id="deleteChildBtn" class="btn btn-danger" style="background: #ef4444 !important; color: white !important; border: 1px solid #dc2626 !important; padding: 12px 24px !important; border-radius: 8px !important; font-weight: 600 !important; cursor: pointer !important; transition: all 0.2s ease !important; display: inline-block !important; width: 180px !important; font-size: 14px !important; text-align: center !important; box-sizing: border-box !important;">Delete Child Account</button>
+                                        </div>
+                                    </div>
                                 </div>
                             </div>
                         </div>
@@ -159,6 +216,17 @@
                                     <button type="submit" class="btn btn-primary">Add Child</button>
                                 </form>
                             </div>
+                    </div>
+                </div>
+
+                <!-- Transaction History Modal -->
+                <div id="transactionHistoryModal" class="modal" style="display: none;">
+                    <div class="modal-content">
+                        <span class="close" id="transactionHistoryClose">&times;</span>
+                        <h2>Transaction History</h2>
+                        <div id="historyTransactionList" class="transaction-list">
+                            <!-- Transactions will be populated here -->
+                        </div>
                         </div>
                 </div>
             </div>
@@ -187,10 +255,22 @@
                                 <span class="action-icon">💵</span>
                                 <span>Request Money</span>
                             </button>
+                            <button id="requestAddMoneyBtn" class="action-btn">
+                                <span class="action-icon">💰</span>
+                                <span>Ask for Money</span>
+                            </button>
                             <button id="transferMoneyBtn" class="action-btn">
                                 <span class="action-icon">🔄</span>
                                 <span>Transfer to Sibling</span>
                             </button>
+                        </div>
+                    </section>
+
+                    <!-- Pending Requests -->
+                    <section class="dashboard-section pending-requests">
+                        <h2>My Pending Requests</h2>
+                        <div id="childPendingList" class="transaction-list">
+                            <!-- Pending requests will be populated here -->
                         </div>
                     </section>
 
@@ -246,6 +326,25 @@
                             </form>
                         </div>
                     </div>
+
+                    <!-- Money Addition Request Modal -->
+                    <div id="addMoneyRequestModal" class="modal" style="display: none;">
+                        <div class="modal-content">
+                            <span class="close">&times;</span>
+                            <h2>Ask for Money</h2>
+                            <form id="addMoneyRequestForm">
+                                <div class="form-group">
+                                    <label for="addMoneyAmount">Amount</label>
+                                    <input type="number" id="addMoneyAmount" min="0.01" step="0.01" required placeholder="0.00">
+                                </div>
+                                <div class="form-group">
+                                    <label for="addMoneyReason">What for?</label>
+                                    <textarea id="addMoneyReason" required placeholder="Tell your parent why you need money"></textarea>
+                                </div>
+                                <button type="submit" class="btn btn-primary">Send Request</button>
+                            </form>
+                        </div>
+                    </div>
                 </div>
             </div>
 
@@ -261,6 +360,21 @@
                 <button onclick="location.reload()" class="btn btn-primary">Refresh</button>
             </div>
         </main>
+
+        <!-- Toast Container -->
+        <div id="toastContainer" class="toast-container"></div>
+
+        <!-- Confirm Modal -->
+        <div id="confirmModal" class="modal" style="display:none;">
+            <div class="modal-content">
+                <h3 id="confirmTitle">Please Confirm</h3>
+                <p id="confirmMessage"></p>
+                <div class="confirm-actions" style="display:flex;gap:8px;justify-content:flex-end;margin-top:12px;">
+                    <button id="confirmCancel" class="btn btn-secondary">Cancel</button>
+                    <button id="confirmOk" class="btn btn-primary">OK</button>
+                </div>
+            </div>
+        </div>
 
         <footer>
             <p>&copy; 2024 Piggybanks.app. All rights reserved.</p>
