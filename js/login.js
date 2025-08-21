@@ -1,13 +1,13 @@
 document.addEventListener('DOMContentLoaded', () => {
   console.log('[Login] Page initialized');
-  
+
   // Request state tracking to prevent duplicate submissions
   let parentLoginInProgress = false;
   let childLoginInProgress = false;
-  
+
   // Redirect if already authenticated
   Auth.redirectIfAuthenticated();
-  
+
   // Accessibility roles for the toggle
   const selector = document.querySelector('.login-type-selector');
   if (selector) selector.setAttribute('role', 'tablist');
@@ -21,6 +21,109 @@ document.addEventListener('DOMContentLoaded', () => {
   const childFooter = document.getElementById('childFooter');
   const parentErrorMessage = document.getElementById('parentErrorMessage');
   const childErrorMessage = document.getElementById('childErrorMessage');
+
+  // Interactive Loading Tips during login
+  const LOGIN_TIPS = [
+    'Parents approve withdrawals before money leaves.',
+    'Kids log in with a simple 4-digit PIN.',
+    'Add notes so everyone remembers why money changed.',
+    'Kids can request money; parents review and approve.',
+    'Kids can request to send money to siblings.',
+    'Dashboard shows balances and recent activity.',
+    'Parents can add money instantly—no approval needed.',
+    'Set a savings goal and track progress.',
+    'You can log out anytime from dashboard header.',
+    'Pro tip: Keep PINs private and easy to remember.',
+    'Kids can view their balance anytime on dashboard.',
+    'Request money additions with optional reasons.',
+    'Transfer money to siblings with parent approval.',
+    'Check transaction history to see all activity.',
+    'Use your PIN to login quickly and securely.',
+    'Parents can instantly add money without approval.',
+    'Approve or deny child requests from one place.',
+    'Manage all children accounts from parent dashboard.',
+    'Monitor family spending with detailed oversight.',
+    'Track all family transactions in one location.'
+  ];
+
+  const tipsPanel = document.getElementById('loginLoadingTips');
+  const tipTextEl = tipsPanel ? tipsPanel.querySelector('.tip-text') : null;
+  const progressEl = tipsPanel ? tipsPanel.querySelector('.tip-progress') : null;
+  const progressFillEl = tipsPanel ? tipsPanel.querySelector('.tip-progress-fill') : null;
+  let tipsIntervalId = null;
+  let shownTipIndices = [];
+  let tipsActive = false;
+
+  function pickRandomTipIndex() {
+    if (LOGIN_TIPS.length <= 1) return 0;
+
+    // If all tips have been shown, reset the shown list
+    if (shownTipIndices.length >= LOGIN_TIPS.length) {
+      shownTipIndices = [];
+    }
+
+    // Get available tip indices (not yet shown)
+    const availableIndices = [];
+    for (let i = 0; i < LOGIN_TIPS.length; i++) {
+      if (!shownTipIndices.includes(i)) {
+        availableIndices.push(i);
+      }
+    }
+
+    // Pick random from available indices
+    const randomIndex = Math.floor(Math.random() * availableIndices.length);
+    const selectedIndex = availableIndices[randomIndex];
+
+    // Mark this tip as shown
+    shownTipIndices.push(selectedIndex);
+
+    return selectedIndex;
+  }
+
+  function renderTip() {
+    if (tipTextEl) {
+      tipTextEl.textContent = LOGIN_TIPS[pickRandomTipIndex()];
+    }
+  }
+
+  function startLoginTips() {
+    if (!tipsPanel || tipsActive) return;
+    tipsActive = true;
+    // Reset shown tips for new session
+    shownTipIndices = [];
+    tipsPanel.style.display = '';
+    renderTip();
+    if (tipsIntervalId) clearInterval(tipsIntervalId);
+    tipsIntervalId = setInterval(renderTip, 5000);
+    // animate progress bar
+    if (progressFillEl) {
+      progressFillEl.style.width = '0%';
+      let elapsed = 0;
+      const step = 100; // ms
+      if (window.__loginProgressTimer) clearInterval(window.__loginProgressTimer);
+      window.__loginProgressTimer = setInterval(() => {
+        elapsed += step;
+        const pct = Math.min(100, (elapsed / 5000) * 100);
+        progressFillEl.style.width = pct + '%';
+        if (elapsed >= 5000) elapsed = 0;
+      }, step);
+    }
+  }
+
+  function stopLoginTips() {
+    tipsActive = false;
+    if (tipsIntervalId) {
+      clearInterval(tipsIntervalId);
+      tipsIntervalId = null;
+    }
+    if (window.__loginProgressTimer) {
+      clearInterval(window.__loginProgressTimer);
+      window.__loginProgressTimer = null;
+    }
+    if (tipsPanel) tipsPanel.style.display = 'none';
+  }
+
+
 
   function setMode(type) {
     buttons.forEach((btn) => {
@@ -118,47 +221,47 @@ document.addEventListener('DOMContentLoaded', () => {
       }
     });
   });
-  
+
   // Parent Login Form Handler
   if (parentForm) {
     parentForm.addEventListener('submit', async (e) => {
       e.preventDefault();
-      
+
       // Check if a login is already in progress
       if (parentLoginInProgress) {
         console.log('[Login] Parent login already in progress, ignoring duplicate submission');
         return;
       }
-      
+
       // Clear error message
       if (parentErrorMessage) {
         parentErrorMessage.textContent = '';
         parentErrorMessage.style.display = 'none';
       }
-      
+
       // Get form data
       const formData = new FormData(parentForm);
       const email = formData.get('email').trim().toLowerCase();
       const password = formData.get('password');
-      
+
       if (!email || !password) {
         showParentError('Email and password are required');
         return;
       }
-      
+
       // Set login in progress flag
       parentLoginInProgress = true;
       console.log('[Login] Starting parent login for:', email);
-      
+
       // Disable form during submission
       setParentFormLoading(true);
-      
+
       try {
         const startTime = Date.now();
         const result = await Auth.loginParent(email, password);
         const duration = Date.now() - startTime;
         console.log(`[Login] Parent login completed in ${duration}ms`);
-        
+
         if (result.success) {
           console.log('[Login] Parent login successful, redirecting to dashboard');
           // Redirect to dashboard
@@ -177,52 +280,52 @@ document.addEventListener('DOMContentLoaded', () => {
       }
     });
   }
-  
+
   // Child Login Form Handler
   if (childForm) {
     childForm.addEventListener('submit', async (e) => {
       e.preventDefault();
-      
+
       // Check if a login is already in progress
       if (childLoginInProgress) {
         console.log('[Login] Child login already in progress, ignoring duplicate submission');
         return;
       }
-      
+
       // Clear error message
       if (childErrorMessage) {
         childErrorMessage.textContent = '';
         childErrorMessage.style.display = 'none';
       }
-      
+
       // Get form data
       const formData = new FormData(childForm);
-      const username = formData.get('username').trim();
+      const username = formData.get('username').trim().toLowerCase();
       const pin = hiddenPin ? hiddenPin.value : '';
-      
+
       if (!username) {
         showChildError('Username is required');
         return;
       }
-      
+
       if (!pin || pin.length !== 4) {
         showChildError('Please enter a 4-digit PIN');
         return;
       }
-      
+
       // Set login in progress flag
       childLoginInProgress = true;
       console.log('[Login] Starting child login for:', username);
-      
+
       // Disable form during submission
       setChildFormLoading(true);
-      
+
       try {
         const startTime = Date.now();
         const result = await Auth.loginChild(username, pin);
         const duration = Date.now() - startTime;
         console.log(`[Login] Child login completed in ${duration}ms`);
-        
+
         if (result.success) {
           console.log('[Login] Child login successful, redirecting to dashboard');
           // Redirect to dashboard
@@ -245,7 +348,7 @@ document.addEventListener('DOMContentLoaded', () => {
       }
     });
   }
-  
+
   // Helper functions
   function showParentError(message) {
     if (parentErrorMessage) {
@@ -253,44 +356,48 @@ document.addEventListener('DOMContentLoaded', () => {
       parentErrorMessage.style.display = 'block';
     }
   }
-  
+
   function showChildError(message) {
     if (childErrorMessage) {
       childErrorMessage.textContent = message;
       childErrorMessage.style.display = 'block';
     }
   }
-  
+
   function setParentFormLoading(loading) {
     const submitButton = parentForm.querySelector('button[type="submit"]');
     const inputs = parentForm.querySelectorAll('input');
-    
+
     if (loading) {
       submitButton.disabled = true;
       submitButton.textContent = 'Logging in...';
       inputs.forEach(input => input.disabled = true);
+      startLoginTips();
     } else {
       submitButton.disabled = false;
       submitButton.textContent = 'Login as Parent';
       inputs.forEach(input => input.disabled = false);
+      stopLoginTips();
     }
   }
-  
+
   function setChildFormLoading(loading) {
     const submitButton = childForm.querySelector('button[type="submit"]');
     const inputs = childForm.querySelectorAll('input');
-    
+
     if (loading) {
       submitButton.disabled = true;
       submitButton.textContent = 'Logging in...';
       inputs.forEach(input => input.disabled = true);
+      startLoginTips();
     } else {
       submitButton.disabled = false;
       submitButton.textContent = 'Login as Child';
       inputs.forEach(input => input.disabled = false);
+      stopLoginTips();
     }
   }
-  
+
   // Add keyboard shortcut to submit forms (Enter key)
   // This is already handled by default form submission, but we'll ensure it's working
   if (parentForm) {
@@ -303,7 +410,7 @@ document.addEventListener('DOMContentLoaded', () => {
       });
     });
   }
-  
+
   if (childForm) {
     childForm.querySelectorAll('input:not(.pin-input)').forEach(input => {
       input.addEventListener('keydown', (e) => {
@@ -314,7 +421,7 @@ document.addEventListener('DOMContentLoaded', () => {
       });
     });
   }
-  
+
   console.log('[Login] Event handlers attached successfully');
 });
 

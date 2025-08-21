@@ -5,6 +5,8 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Dashboard - Piggybanks.app</title>
     <link rel="stylesheet" href="css/styles.css">
+    <link rel="stylesheet" href="css/additions.css">
+
 </head>
 <body>
     <div class="container">
@@ -12,10 +14,8 @@
             <div class="logo">
                 <h1>🐷 Piggybanks.app</h1>
             </div>
-            <div class="user-info">
-                <span id="userName"></span>
-                <button id="logoutBtn" class="btn btn-secondary">Logout</button>
-            </div>
+            <div id="userName" class="welcome"></div>
+            <button id="logoutBtn" class="btn btn-secondary logout-btn">Logout</button>
         </header>
 
         <main class="dashboard-container">
@@ -44,7 +44,7 @@
                     <!-- Children List Section -->
                     <section class="dashboard-section children-list">
                         <div class="section-header">
-                            <h2>Your Children</h2>
+                            <h2>Your Children's Piggybank Accounts</h2>
                             <button id="addChildBtn" class="add-child-btn" title="Add New Child">+</button>
                         </div>
                         <div id="childrenList" class="children-cards">
@@ -236,39 +236,49 @@
                 <div class="child-dashboard-grid">
                     <!-- Balance Section -->
                     <section class="dashboard-section balance-section">
-                        <h2>My Piggy Bank</h2>
-                        <div class="balance-display">
-                            <div class="piggy-icon">🐷</div>
-                            <div class="balance-amount">
-                                <span class="currency">$</span>
-                                <span id="childBalance">0.00</span>
+                        <div class="section-header">
+                            <h2 id="childPiggyTitle">My Piggy Bank</h2>
+                        </div>
+                        <div class="balance-container">
+                            <div id="balanceDisplay" class="balance-display">
+                                <div class="piggy-icon">🐷</div>
+                                <div class="balance-amount">
+                                    <span class="currency">$</span>
+                                    <span id="childBalance">0.00</span>
+                                </div>
                             </div>
-
+                            <div class="balance-controls">
+                                <button id="balanceColorBtn" class="btn btn-secondary" title="Customize background">🎨</button>
+                            </div>
                         </div>
                     </section>
 
                     <!-- Quick Actions -->
                     <section class="dashboard-section quick-actions">
-                        <h2>What would you like to do?</h2>
+                        <div class="section-header">
+                            <h2 id="childActionsTitle">What would you like to do?</h2>
+                        </div>
                         <div class="action-buttons">
                             <button id="requestWithdrawalBtn" class="action-btn">
                                 <span class="action-icon">💵</span>
-                                <span>Request Money</span>
+                                <span>Withdraw Money</span>
                             </button>
                             <button id="requestAddMoneyBtn" class="action-btn">
                                 <span class="action-icon">💰</span>
-                                <span>Ask for Money</span>
+                                <span>Add Money</span>
                             </button>
                             <button id="transferMoneyBtn" class="action-btn">
                                 <span class="action-icon">🔄</span>
-                                <span>Transfer to Sibling</span>
+                                <span>Transfer Money</span>
                             </button>
                         </div>
                     </section>
 
                     <!-- Pending Requests -->
                     <section class="dashboard-section pending-requests">
-                        <h2>My Pending Requests</h2>
+                        <div class="section-header">
+                            <h2 id="childPendingTitle">My Pending Requests</h2>
+                        </div>
                         <div id="childPendingList" class="transaction-list">
                             <!-- Pending requests will be populated here -->
                         </div>
@@ -276,11 +286,41 @@
 
                     <!-- Transaction History -->
                     <section class="dashboard-section transactions">
-                        <h2>My Transaction History</h2>
+                        <div class="section-header">
+                            <h2 id="childHistoryTitle">My Transaction History</h2>
+                        </div>
                         <div id="childTransactionList" class="transaction-list">
                             <!-- Transactions will be populated here -->
                         </div>
                     </section>
+
+
+                        <!-- Balance Color Modal -->
+                        <div id="balanceColorModal" class="modal" style="display:none;">
+                            <div class="modal-content">
+                                <span class="close" id="closeBalanceColorModal">&times;</span>
+                                <h2 class="modal-title centered">Choose Background Color</h2>
+                                <div class="color-picker-wrap">
+                                    <input id="balanceColorPicker" type="color" style="position:fixed!important;top:-9999px!important;left:-9999px!important;width:0!important;height:0!important;opacity:0!important;visibility:hidden!important;pointer-events:none!important;z-index:-9999!important;display:none!important;" />
+                                    <div id="balancePickerBox" class="color-picker-box" tabindex="0" aria-label="Color picker">
+                                        <div class="custom-color-picker">
+                                            <div class="color-swatch" style="background-color: #667eea"></div>
+                                            <span class="color-text">Choose colour</span>
+                                        </div>
+                                    </div>
+
+                                    <!-- Embedded picker container: appears between the picker button and the header preview -->
+                                    <div id="embeddedPickerContainer" class="color-picker-panel" aria-live="polite" style="display:none;"></div>
+
+                                    <div id="balancePreview" class="balance-preview">
+                                        <div class="piggy-icon">🐷</div>
+                                        <div class="balance-amount"><span class="currency">$</span><span id="balancePreviewAmount">0.00</span></div>
+                                    </div>
+
+                                    <button id="saveBalanceColor" class="btn btn-primary">Save Colour</button>
+                                </div>
+                            </div>
+                        </div>
 
                     <!-- Request Withdrawal Modal -->
                     <div id="withdrawalModal" class="modal" style="display: none;">
@@ -331,7 +371,7 @@
                     <div id="addMoneyRequestModal" class="modal" style="display: none;">
                         <div class="modal-content">
                             <span class="close">&times;</span>
-                            <h2>Ask for Money</h2>
+                            <h2>Add Money</h2>
                             <form id="addMoneyRequestForm">
                                 <div class="form-group">
                                     <label for="addMoneyAmount">Amount</label>
@@ -352,7 +392,14 @@
             <div id="loadingState" class="loading-state">
                 <div class="spinner"></div>
                 <p>Loading your dashboard...</p>
+                <div id="dashboardLoadingTips" class="loading-tips" style="display: none;" aria-live="polite">
+                    <p class="tip-text">Warming up your dashboard…</p>
+                    <div class="tip-progress" role="progressbar" aria-label="Loading next tip">
+                        <div class="tip-progress-fill"></div>
+                    </div>
+                </div>
             </div>
+
 
             <!-- Error State -->
             <div id="errorState" class="error-state" style="display: none;">

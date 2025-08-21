@@ -1,6 +1,6 @@
 // Dashboard page functionality
 document.addEventListener('DOMContentLoaded', async () => {
-    console.log('[Dashboard] Initializing dashboard');
+    // console.log('[Dashboard] Initializing dashboard');
 
     // Get user data - Auth module already verified token on page load
     const user = Auth.getUser();
@@ -13,7 +13,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     // Skip redundant token verification - auth.js already did this
     // The auth module's automatic verification runs before DOMContentLoaded
-    console.log('[Dashboard] User authenticated:', user.username || user.email);
+    // console.log('[Dashboard] User authenticated:', user.username || user.email);
 
     // Display user information
     displayUserInfo(user);
@@ -21,20 +21,152 @@ document.addEventListener('DOMContentLoaded', async () => {
     // Setup logout functionality
     setupLogout();
 
-    // Hide loading state
+    // Setup loading and error states
     const loadingState = document.getElementById('loadingState');
-    if (loadingState) {
-        loadingState.style.display = 'none';
-    }
+    const errorState = document.getElementById('errorState');
+
+
+	    // Rotating tips during dashboard loading
+	    const DASHBOARD_TIPS = [
+	        'Parents add money instantly.',
+	        'Pending approvals are listed below children cards.',
+	        'Kids can request withdrawals that parents approve or deny.',
+	        'Track every change in the transaction history.',
+	        'Set savings goals and watch progress grow.',
+	        'Transfers between siblings start as a request.',
+	        'Use notes on transactions to remember the “why”.',
+	        'Children log in with a simple 4-digit PIN.',
+	        'Balances update immediately after approvals.',
+	        'Pro tip: Keep PINs private and easy to remember.',
+	        'Kids can view their balance anytime on dashboard.',
+	        'Request money additions with optional reasons.',
+	        'Transfer money to siblings with parent approval.',
+	        'Check transaction history to see all activity.',
+	        'Use your PIN to login quickly and securely.',
+	        'Parents can instantly add money without approval.',
+	        'Approve or deny child requests from one place.',
+	        'Manage all children accounts from parent dashboard.',
+	        'Monitor family spending with detailed oversight.',
+	        'Track all family transactions in one location.'
+	    ];
+	    const tipsPanel = document.getElementById('dashboardLoadingTips');
+	    const tipTextEl = tipsPanel ? tipsPanel.querySelector('.tip-text') : null;
+	    const progressEl = tipsPanel ? tipsPanel.querySelector('.tip-progress') : null;
+const progressFillEl = tipsPanel ? tipsPanel.querySelector('.tip-progress-fill') : null;
+	    let tipsIntervalId = null;
+	    let shownTipIndices = [];
+	    let tipsActive = false;
+
+	    function pickRandomTipIndex() {
+	        if (DASHBOARD_TIPS.length <= 1) return 0;
+
+	        // If all tips have been shown, reset the shown list
+	        if (shownTipIndices.length >= DASHBOARD_TIPS.length) {
+	            shownTipIndices = [];
+	        }
+
+	        // Get available tip indices (not yet shown)
+	        const availableIndices = [];
+	        for (let i = 0; i < DASHBOARD_TIPS.length; i++) {
+	            if (!shownTipIndices.includes(i)) {
+	                availableIndices.push(i);
+	            }
+	        }
+
+	        // Pick random from available indices
+	        const randomIndex = Math.floor(Math.random() * availableIndices.length);
+	        const selectedIndex = availableIndices[randomIndex];
+
+	        // Mark this tip as shown
+	        shownTipIndices.push(selectedIndex);
+
+	        return selectedIndex;
+	    }
+
+	    function renderTip() {
+	        if (tipTextEl) tipTextEl.textContent = DASHBOARD_TIPS[pickRandomTipIndex()];
+                if (progressFillEl) progressFillEl.style.width = '0%';
+
+	    }
+                if (progressFillEl) progressFillEl.style.width = '0%';
+
+
+	    function startDashboardTips() {
+	        if (!tipsPanel || tipsActive) return;
+	        tipsActive = true;
+	        // Reset shown tips for new session
+	        shownTipIndices = [];
+	        tipsPanel.style.display = '';
+	        renderTip();
+	        if (tipsIntervalId) clearInterval(tipsIntervalId);
+	        tipsIntervalId = setInterval(renderTip, 5000);
+        // animate progress bar
+        if (progressFillEl) {
+            progressFillEl.style.width = '0%';
+            let elapsed = 0;
+            const step = 100; // ms
+            if (window.__dashProgressTimer) clearInterval(window.__dashProgressTimer);
+            window.__dashProgressTimer = setInterval(() => {
+                elapsed += step;
+                const pct = Math.min(100, (elapsed / 5000) * 100);
+                progressFillEl.style.width = pct + '%';
+                if (elapsed >= 5000) elapsed = 0;
+            }, step);
+        }
+	    }
+
+	    function stopDashboardTips() {
+	        tipsActive = false;
+	        if (tipsIntervalId) {
+	            clearInterval(tipsIntervalId);
+	            tipsIntervalId = null;
+        }
+        if (window.__dashProgressTimer) {
+            clearInterval(window.__dashProgressTimer);
+            window.__dashProgressTimer = null;
+	        }
+	        if (tipsPanel) tipsPanel.style.display = 'none';
+	    }
+
+
+
+    const showLoading = () => { if (loadingState) loadingState.style.display = 'block'; startDashboardTips(); };
+    const hideLoading = () => { if (loadingState) loadingState.style.display = 'none'; stopDashboardTips(); };
+    const showError = () => { if (errorState) errorState.style.display = 'block'; };
+
+    // Show loader while fetching dashboard data
+    showLoading();
 
     // Ensure UX helpers (toasts, confirms) are available for all roles
+
+    // Safety: force-hide loader after a timeout in case of unexpected errors before try/finally runs
+    const FORCE_HIDE_AFTER_MS = 10000;
+    setTimeout(() => {
+        try {
+            const el = document.getElementById('loadingState');
+            const tips = document.getElementById('dashboardLoadingTips');
+            if (el && el.style.display !== 'none') {
+                console.warn('[Dashboard] Force-hiding loader after timeout');
+                el.style.display = 'none';
+            }
+            if (tips && tips.style.display !== 'none') tips.style.display = 'none';
+        } catch (_) {}
+    }, FORCE_HIDE_AFTER_MS);
+
     setupUXHelpers();
 
-    // Load content based on user role
-    if (user.role === 'parent') {
-        loadParentDashboard();
-    } else if (user.role === 'child') {
-        loadChildDashboard();
+    // Load content based on user role and hide loader when done
+    try {
+        if (user.role === 'parent') {
+            await loadParentDashboard();
+        } else if (user.role === 'child') {
+            await loadChildDashboard();
+        }
+    } catch (e) {
+        console.error('[Dashboard] Failed to load dashboard', e);
+        showError();
+    } finally {
+        hideLoading();
     }
 });
 
@@ -77,9 +209,6 @@ async function loadParentDashboard() {
     const parentDashboard = document.getElementById('parentDashboard');
     const childDashboard = document.getElementById('childDashboard');
 
-    if (parentDashboard) {
-        parentDashboard.style.display = 'block';
-    }
     if (childDashboard) {
         childDashboard.style.display = 'none';
     }
@@ -96,6 +225,16 @@ async function loadParentDashboard() {
 
     // Setup toasts and confirm modal
     setupUXHelpers();
+
+    // Show dashboard now that data is loaded
+    if (parentDashboard) {
+        parentDashboard.style.display = 'block';
+    }
+    // Extra guard: hide any loading UI if still visible
+    const ls = document.getElementById('loadingState');
+    const lt = document.getElementById('dashboardLoadingTips');
+    if (ls) ls.style.display = 'none';
+    if (lt) lt.style.display = 'none';
 }
 
 /**
@@ -282,24 +421,250 @@ async function loadChildDashboard() {
     if (parentDashboard) {
         parentDashboard.style.display = 'none';
     }
-    if (childDashboard) {
-        childDashboard.style.display = 'block';
-    }
+    // Do not show child dashboard until data is loaded
 
-    // Display child's actual balance from user data
+    // Display child's actual balance from user data and personalize headings
     const balanceElement = document.getElementById('childBalance');
-    if (balanceElement) {
-        const user = Auth.getUser();
-        const balance = (user && typeof user.savings === 'number') ? user.savings : 0;
+    const user = Auth.getUser();
+    if (balanceElement && user) {
+        const balance = (typeof user.savings === 'number') ? user.savings : 0;
         balanceElement.textContent = balance.toFixed(2);
     }
+
+    // Personalize headings with child's name
+    try {
+        const name = user?.name || user?.username || 'My';
+        const possessive = name.endsWith('s') ? `${name}'` : `${name}'s`;
+        const piggyTitle = document.getElementById('childPiggyTitle');
+        const actionsTitle = document.getElementById('childActionsTitle');
+        const pendingTitle = document.getElementById('childPendingTitle');
+        const historyTitle = document.getElementById('childHistoryTitle');
+        if (piggyTitle) piggyTitle.textContent = `${possessive} Piggy Bank`;
+        if (actionsTitle) actionsTitle.textContent = `What would you like to do ${name}?`;
+        if (pendingTitle) pendingTitle.textContent = `${possessive} Pending Requests`;
+        if (historyTitle) historyTitle.textContent = `${possessive} Transaction History`;
+    } catch (e) { /* ignore */ }
+
+    // Setup color picker modal for balance background
+    try {
+        const colorBtn = document.getElementById('balanceColorBtn');
+        const colorInput = document.getElementById('balanceColorPicker');
+        const pickerBox = document.getElementById('balancePickerBox');
+        const modal = document.getElementById('balanceColorModal');
+        const closeBtn = document.getElementById('closeBalanceColorModal');
+        const saveBtn = document.getElementById('saveBalanceColor');
+        if (colorBtn && colorInput && pickerBox && modal && closeBtn && saveBtn) {
+            const preview = document.getElementById('balancePreview');
+            const previewAmt = document.getElementById('balancePreviewAmount');
+
+            function applyPreview(hex) {
+                if (!preview) return;
+                preview.style.background = `linear-gradient(135deg, ${hex} 0%, ${shadeColor(hex, -20)} 100%)`;
+            }
+
+            function updatePickerSwatch(color) {
+                const swatch = pickerBox.querySelector('.color-swatch');
+                if (swatch) {
+                    swatch.style.backgroundColor = color;
+                }
+            }
+
+            colorBtn.addEventListener('click', () => {
+                const current = user.preferences?.backgroundColor || '#667eea';
+                colorInput.value = current;
+                applyPreview(current);
+                updatePickerSwatch(current);
+                if (previewAmt) previewAmt.textContent = (Auth.getUser()?.savings ?? 0).toFixed(2);
+                modal.style.display = 'flex';
+                // Ensure the embedded picker is visible and initialized inside the modal
+                renderEmbeddedPicker(current);
+            });
+
+            // Build an embedded custom color picker so it appears inside the modal
+            const embedded = document.getElementById('embeddedPickerContainer');
+            function hsvToHex(h, s, v) {
+                s /= 100; v /= 100;
+                const c = v * s;
+                const x = c * (1 - Math.abs((h / 60) % 2 - 1));
+                const m = v - c;
+                let [r, g, b] = [0, 0, 0];
+                if (h < 60) [r, g, b] = [c, x, 0];
+                else if (h < 120) [r, g, b] = [x, c, 0];
+                else if (h < 180) [r, g, b] = [0, c, x];
+                else if (h < 240) [r, g, b] = [0, x, c];
+                else if (h < 300) [r, g, b] = [x, 0, c];
+                else [r, g, b] = [c, 0, x];
+                const to255 = (n) => Math.round((n + m) * 255);
+                const hex = (n) => n.toString(16).padStart(2, '0');
+                return `#${hex(to255(r))}${hex(to255(g))}${hex(to255(b))}`;
+            }
+            function hexToHsv(hex) {
+                let c = hex.replace('#', '');
+                if (c.length === 3) c = c.split('').map(ch => ch + ch).join('');
+                const r = parseInt(c.slice(0,2), 16) / 255;
+                const g = parseInt(c.slice(2,4), 16) / 255;
+                const b = parseInt(c.slice(4,6), 16) / 255;
+                const max = Math.max(r, g, b), min = Math.min(r, g, b);
+                const d = max - min;
+                let h = 0; if (d !== 0) {
+                    switch (max) {
+                        case r: h = ((g - b) / d) % 6; break;
+                        case g: h = (b - r) / d + 2; break;
+                        case b: h = (r - g) / d + 4; break;
+                    }
+                    h *= 60; if (h < 0) h += 360;
+                }
+                const s = max === 0 ? 0 : d / max;
+                const v = max;
+                return { h, s: s * 100, v: v * 100 };
+            }
+            function renderEmbeddedPicker(startHex) {
+                if (!embedded) return;
+                embedded.style.display = 'flex';
+                const startHSV = hexToHsv(startHex);
+                embedded.innerHTML = `
+                    <div class="picker-sv" id="pickerSV">
+                        <div class="picker-handle" id="svHandle" style="left:${startHSV.s}%; top:${100-startHSV.v}%"></div>
+                    </div>
+                    <div class="picker-hue" id="pickerHue">
+                        <div class="picker-handle" id="hHandle" style="left:${startHSV.h/3.6}%; top:50%"></div>
+                    </div>
+                `;
+                const sv = embedded.querySelector('#pickerSV');
+                const hue = embedded.querySelector('#pickerHue');
+                const svHandle = embedded.querySelector('#svHandle');
+                const hHandle = embedded.querySelector('#hHandle');
+                let H = startHSV.h, S = startHSV.s, V = startHSV.v;
+                function updateAll(push=true) {
+                    // Update SV background to current hue
+                    sv.style.backgroundColor = hsvToHex(H, 100, 100);
+                    // Update handles
+                    svHandle.style.left = `${S}%`;
+                    svHandle.style.top = `${100 - V}%`;
+                    hHandle.style.left = `${H/3.6}%`;
+                    const hex = hsvToHex(H, S, V);
+                    colorInput.value = hex;
+                    updatePickerSwatch(hex);
+                    applyPreview(hex);
+                    if (push) {
+                        const swatch = document.querySelector('.color-swatch');
+                        if (swatch) swatch.style.backgroundColor = hex;
+                    }
+                }
+                function onSV(e) {
+                    const rect = sv.getBoundingClientRect();
+                    const x = Math.min(Math.max(0, e.clientX - rect.left), rect.width);
+                    const y = Math.min(Math.max(0, e.clientY - rect.top), rect.height);
+                    S = Math.round((x / rect.width) * 100);
+                    V = Math.round(100 - (y / rect.height) * 100);
+                    updateAll();
+                }
+                function onHue(e) {
+                    const rect = hue.getBoundingClientRect();
+                    const x = Math.min(Math.max(0, e.clientX - rect.left), rect.width);
+                    H = Math.round((x / rect.width) * 360);
+                    updateAll();
+                }
+                const drag = (el, handler) => {
+                    const move = (ev) => handler(ev);
+                    const up = () => { window.removeEventListener('mousemove', move); window.removeEventListener('mouseup', up); };
+                    window.addEventListener('mousemove', move);
+                    window.addEventListener('mouseup', up);
+                };
+                sv.addEventListener('mousedown', (e) => { onSV(e); drag(sv, onSV); });
+                hue.addEventListener('mousedown', (e) => { onHue(e); drag(hue, onHue); });
+                // Initialize background and preview
+                updateAll(false);
+            }
+
+            // Clicking the box reveals embedded picker in place (no OS dialog)
+            pickerBox.addEventListener('click', () => {
+                const current = colorInput.value || '#667eea';
+                renderEmbeddedPicker(current);
+            });
+
+            // Also allow Enter/Space to open the embedded picker for accessibility
+            pickerBox.addEventListener('keydown', (e) => {
+                if (e.key === 'Enter' || e.key === ' ') {
+                    e.preventDefault();
+                    const current = colorInput.value || '#667eea';
+                    renderEmbeddedPicker(current);
+                }
+            });
+            closeBtn.addEventListener('click', () => { modal.style.display = 'none'; });
+            modal.addEventListener('click', (e) => { if (e.target === modal) modal.style.display = 'none'; });
+            saveBtn.addEventListener('click', async () => {
+                const base = colorInput.value;
+                try {
+                    const res = await API.updateMyPreferences({ backgroundColor: base });
+                    if (res && res.success) {
+                        const localUser = Auth.getUser() || {};
+                        localUser.preferences = localUser.preferences || {};
+                        localUser.preferences.backgroundColor = base;
+                        localStorage.setItem(CONFIG.USER_KEY, JSON.stringify(localUser));
+                        // Immediately apply to the header background without a refresh
+                        const display = document.getElementById('balanceDisplay');
+                        if (display) {
+                            const grad = `linear-gradient(135deg, ${base} 0%, ${shadeColor(base, -20)} 100%)`;
+                            display.style.background = grad;
+                        }
+                        showToast('Background color saved', 'Your dashboard has been updated', 'success');
+                        modal.style.display = 'none';
+                    } else {
+                        showToast('Failed to save', (res && res.error) || 'Please try again', 'error');
+                    }
+                } catch (err) {
+                    console.error('Save preferences error', err);
+                    showToast('Failed to save', err.message || 'Please try again', 'error');
+                }
+            });
+        }
+    } catch (e) { /* ignore */ }
+
+    // Apply saved background color (if any)
+    try {
+        const balanceDisplay = document.getElementById('balanceDisplay');
+        const savedColor = user?.preferences?.backgroundColor;
+        if (balanceDisplay && savedColor) {
+            balanceDisplay.style.background = `linear-gradient(135deg, ${savedColor} 0%, ${shadeColor(savedColor, -20)} 100%)`;
+        }
+    } catch (e) { /* ignore */ }
+
 
     // Setup child actions
     setupChildActions();
 
+    // Utility: lighten/darken a hex color by percent (-100 to +100)
+    function shadeColor(hex, percent) {
+        try {
+            let c = hex.replace('#','');
+            if (c.length === 3) c = c.split('').map(ch => ch + ch).join('');
+            const num = parseInt(c, 16);
+            let r = (num >> 16) & 0xFF;
+            let g = (num >> 8) & 0xFF;
+            let b = num & 0xFF;
+            const amt = Math.round(2.55 * percent);
+            r = Math.min(255, Math.max(0, r + amt));
+            g = Math.min(255, Math.max(0, g + amt));
+            b = Math.min(255, Math.max(0, b + amt));
+            return `#${((1 << 24) + (r << 16) + (g << 8) + b).toString(16).slice(1)}`;
+        } catch (e) { return hex; }
+    }
+
+
     // Load pending requests then transaction history
     await loadChildPendingRequests();
     await loadChildTransactionHistory();
+
+    // Show dashboard now that data is loaded
+    if (childDashboard) {
+        childDashboard.style.display = 'block';
+    }
+    // Extra guard: hide any loading UI if still visible
+    const ls2 = document.getElementById('loadingState');
+    const lt2 = document.getElementById('dashboardLoadingTips');
+    if (ls2) ls2.style.display = 'none';
+    if (lt2) lt2.style.display = 'none';
 }
 
 /**
@@ -548,30 +913,34 @@ async function loadPendingApprovals() {
                 .sort((a,b) => new Date(b.date) - new Date(a.date))
                 .slice(start, start + pageSize);
             const html = pageItems.map(item => {
-                const date = new Date(item.date).toLocaleDateString();
-                const time = new Date(item.date).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-                let label, desc, meta, approveAction, rejectAction;
+                const d = new Date(item.date);
+                const day = String(d.getDate()).padStart(2, '0');
+                const month = String(d.getMonth() + 1).padStart(2, '0');
+                const year2 = String(d.getFullYear()).slice(-2);
+                const time = d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: true });
+                const dateTime = `${day}/${month}/${year2} ${time}`;
+                let label, reason, meta, approveAction, rejectAction;
 
                 if (item.kind === 'withdrawal') {
-                    label = 'Withdrawal';
-                    desc = item.reason;
+                    label = 'Withdrawal Request';
+                    reason = item.reason || '';
                     const child = childMap[String(item.childId)] || {};
-                    meta = `Child: ${child.name || item.childId}`;
+                    meta = `From: ${child.name || item.childId}`;
                     approveAction = `approveWithdrawal('${item.id}')`;
                     rejectAction = `rejectWithdrawalPrompt('${item.id}')`;
                 } else if (item.kind === 'transfer') {
-                    label = 'Transfer';
-                    desc = `Transfer: ${item.reason}`;
+                    label = 'Transfer Request';
+                    reason = item.reason || '';
                     const from = childMap[String(item.fromChildId)] || {};
                     const to = childMap[String(item.toChildId)] || {};
                     meta = `From: ${from.name || item.fromChildId} → To: ${to.name || item.toChildId}`;
                     approveAction = `approveTransfer('${item.id}')`;
                     rejectAction = `rejectTransferPrompt('${item.id}')`;
                 } else if (item.kind === 'money_addition') {
-                    label = 'Money Request';
-                    desc = item.reason;
+                    label = 'Add Money Request';
+                    reason = item.reason || '';
                     const child = childMap[String(item.childId)] || {};
-                    meta = `Child: ${child.name || item.childId}`;
+                    meta = `From: ${child.name || item.childId}`;
                     approveAction = `approveMoneyAddition('${item.id}')`;
                     rejectAction = `rejectMoneyAdditionPrompt('${item.id}')`;
                 }
@@ -579,8 +948,8 @@ async function loadPendingApprovals() {
                     <div class="approval-item">
                         <div class="approval-details">
                             <div class="approval-title">${label} - $${Number(item.amount).toFixed(2)}</div>
-                            <div class="approval-desc">${desc}</div>
-                            <div class="approval-meta">${meta} • ${date} ${time}</div>
+                            <div class="approval-meta">${meta} • ${dateTime}</div>
+                            <div class="approval-desc">Reason: ${reason}</div>
                         </div>
                         <div class="approval-actions">
                             <button class="btn btn-secondary" onclick="${rejectAction}">Reject</button>
@@ -1165,11 +1534,12 @@ window.viewHistory = async function(childId, childName) {
     const transactionContainer = document.getElementById('historyTransactionList');
 
     if (modalTitle) {
-        modalTitle.textContent = `Transaction History - ${childName}`;
+        const possessive = childName && childName.endsWith('s') ? `${childName}'` : `${childName}'s`;
+        modalTitle.textContent = `${possessive} Transaction History`;
     }
 
     if (transactionContainer) {
-        transactionContainer.innerHTML = '<p class="loading">Loading transactions...</p>';
+        transactionContainer.innerHTML = '<p class="loading" style="padding: 10px;">Loading transactions...</p>';
     }
 
     modal.style.display = 'flex';
@@ -1180,12 +1550,14 @@ window.viewHistory = async function(childId, childName) {
         if (result.success && result.transactions) {
             let processed = result.transactions;
             try {
+                // Get all children to map usernames to names for transfer descriptions
                 const childrenRes = await Auth.getChildren();
                 if (childrenRes?.success && Array.isArray(childrenRes.children)) {
                     const usernameToName = {};
                     childrenRes.children.forEach(c => {
                         if (c?.username && c?.name) usernameToName[c.username] = c.name;
                     });
+
                     processed = result.transactions.map(t => {
                         if (t?.type === 'transfer' && typeof t.description === 'string') {
                             const newDesc = replaceUsernamesWithNames(t.description, usernameToName);
@@ -1375,7 +1747,7 @@ async function loadChildPendingRequests() {
                 .forEach(r => items.push({
                     type: 'withdrawal',
                     date: r.createdAt,
-                    description: r.reason,
+                    reason: r.reason,
                     amount: r.amount
                 }));
         }
@@ -1397,7 +1769,9 @@ async function loadChildPendingRequests() {
                     items.push({
                         type: 'transfer',
                         date: r.createdAt,
-                        description: `${isOutgoing ? 'To' : 'From'} ${counterpartName}: ${r.reason}`,
+                        isOutgoing,
+                        counterpartName,
+                        reason: r.reason,
                         amount: r.amount
                     });
                 });
@@ -1408,7 +1782,7 @@ async function loadChildPendingRequests() {
                 .forEach(r => items.push({
                     type: 'money_addition',
                     date: r.createdAt,
-                    description: `Money request: ${r.reason}`,
+                    reason: r.reason,
                     amount: r.amount
                 }));
         }
@@ -1418,22 +1792,47 @@ async function loadChildPendingRequests() {
             return;
         }
 
-        // Render as list similar to transactions
+        // Render as list consistent with parent approvals
         const html = items.sort((a,b) => new Date(b.date) - new Date(a.date)).map(item => {
-            const dt = new Date(item.date);
-            const date = dt.toLocaleDateString('en-AU', { day: '2-digit', month: '2-digit', year: '2-digit' });
-            const time = dt.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-            const icon = item.type === 'withdrawal' ? '💵' : '🔄';
-            const label = item.type === 'withdrawal' ? 'Withdrawal (Pending)' : 'Transfer (Pending)';
+            const d = new Date(item.date);
+            const day = String(d.getDate()).padStart(2, '0');
+            const month = String(d.getMonth() + 1).padStart(2, '0');
+            const year2 = String(d.getFullYear()).slice(-2);
+            const time = d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: true });
+            const dateTime = `${day}/${month}/${year2} ${time}`;
+
+            const me = Auth.getUser();
+            const meName = (me && (me.name || me.username)) ? (me.name || me.username) : 'me';
+
+            let icon = '🔄';
+            let label = '';
+            let meta = '';
+            if (item.type === 'withdrawal') {
+                icon = '💵';
+                label = 'Withdrawal Request';
+                meta = `From: ${meName}`;
+            } else if (item.type === 'transfer') {
+                icon = '🔄';
+                label = 'Transfer Request';
+                const fromTo = item.isOutgoing
+                    ? `From: ${meName} → To: ${item.counterpartName}`
+                    : `From: ${item.counterpartName} → To: ${meName}`;
+                meta = fromTo;
+            } else if (item.type === 'money_addition') {
+                icon = '💰';
+                label = 'Add Money Request';
+                meta = `From: ${meName}`;
+            }
+
+            const reason = item.reason || '';
+
             return `
                 <div class="transaction-item ${item.type}">
                     <div class="transaction-icon">${icon}</div>
                     <div class="transaction-details">
-                        <div class="transaction-description">${item.description}</div>
-                        <div class="transaction-meta">
-                            <span class="transaction-type">${label}</span>
-                            <span class="transaction-date">${date} at ${time}</span>
-                        </div>
+                        <div class="transaction-description">${label}</div>
+                        <div class="transaction-meta">${meta} • ${dateTime}</div>
+                        <div class="transaction-reason">Reason: ${reason}</div>
                     </div>
                     <div class="transaction-amount">$${Number(item.amount).toFixed(2)}</div>
                 </div>
@@ -1445,11 +1844,6 @@ async function loadChildPendingRequests() {
         container.innerHTML = '<p class="no-data error">Failed to load pending requests</p>';
     }
 }
-
-/**
- * Load transaction history for child dashboard
- */
-async function loadChildTransactionHistory() {
 
 /**
  * Replace usernames with names in transfer description strings.
@@ -1473,6 +1867,11 @@ function replaceUsernamesWithNames(desc, usernameToName) {
     } catch (_) { /* noop */ }
     return out;
 }
+
+/**
+ * Load transaction history for child dashboard
+ */
+async function loadChildTransactionHistory() {
 
     const transactionList = document.getElementById('childTransactionList');
     if (!transactionList) return;
@@ -1734,7 +2133,6 @@ window.openChildSettings = function(childId, name, username) {
 style.textContent = `
     .child-card.sleek.vertical {
         background: white;
-        border: 2px solid var(--neutral-500);
         border-radius: 12px;
         padding: 16px;
         transition: all 0.2s ease;
@@ -1742,15 +2140,14 @@ style.textContent = `
         flex-direction: column;
         min-height: 160px;
         position: relative;
-        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.7);
         backdrop-filter: blur(10px);
         cursor: default;
     }
     .child-card.sleek.vertical:hover {
         transform: translateY(-2px);
-        box-shadow: 0 8px 25px rgba(0, 0, 0, 0.15);
+        box-shadow: 0 8px 24px rgba(0, 0, 0, 0.9);
         backdrop-filter: blur(15px);
-        border-color: var(--neutral-600);
     }
     .child-card .card-header {
         display: flex;

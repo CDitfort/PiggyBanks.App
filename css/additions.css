@@ -1,0 +1,51 @@
+/* Responsive enhancements for Add Child modal */
+#addChildModal .modal-content {
+  max-width: 560px; /* allow a bit more width on larger phones in landscape */
+}
+
+#addChildModal .add-child-form {
+  display: block;
+}
+
+#addChildModal .form-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+
+@media (max-width: 720px) {
+  #addChildModal .form-row { grid-template-columns: 1fr; }
+}
+
+/* Make long inline lists wrap nicely */
+#addChildModal ul { margin-left: 16px; }
+
+/* Ensure inputs don't overflow their containers */
+#addChildModal .form-group input,
+#addChildModal .form-group textarea,
+#addChildModal .form-group select {
+  width: 100%;
+  max-width: 100%;
+}
+
+
+
+/* Force desktop layout for child balance display: icon inline with amount */
+@media (min-width: 769px) {
+  #childDashboard .balance-display {
+    display: flex !important;
+    flex-direction: row !important;
+    align-items: center !important;
+    justify-content: center !important;
+    gap: 2rem !important;
+  }
+  /* Keep currency and number nicely aligned */
+  #childDashboard .balance-amount { display: flex; align-items: baseline; gap: 0.5rem; }
+}
+
+
+/* Quick Actions labels: larger with increased letter spacing (no extra weight) */
+.quick-actions .action-btn span:last-child {
+  font-size: 1.125rem; /* keep it larger */
+  letter-spacing: -0.010em; /* increased tracking */
+}

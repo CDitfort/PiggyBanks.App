@@ -1,11 +1,11 @@
 // API helper module for additional backend calls
 const API = (function() {
     'use strict';
-    
+
     // Use the centralized request handler from Auth module
     // This ensures consistency, deduplication, and proper request tracking
     const request = Auth.request;
-    
+
     return {
         // Transaction endpoints (for future implementation)
         async addTransaction(childId, amount, description, type = 'deposit') {
@@ -16,11 +16,11 @@ const API = (function() {
                 type
             });
         },
-        
+
         async getTransactions(childId) {
             return request(`/transactions/${childId}`);
         },
-        
+
         // Withdrawal request endpoints
         async createWithdrawalRequest(amount, reason) {
             return request('/withdrawal-requests', 'POST', {
@@ -28,19 +28,19 @@ const API = (function() {
                 reason
             });
         },
-        
+
         async getWithdrawalRequests() {
             return request('/withdrawal-requests');
         },
-        
+
         async approveWithdrawalRequest(requestId) {
             return request(`/withdrawal-requests/${requestId}/approve`, 'POST');
         },
-        
+
         async rejectWithdrawalRequest(requestId, reason) {
             return request(`/withdrawal-requests/${requestId}/reject`, 'POST', { reason });
         },
-        
+
         // Transfer endpoints
         async createTransferRequest(toChildId, amount, reason) {
             return request('/transfers', 'POST', {
@@ -49,15 +49,15 @@ const API = (function() {
                 reason
             });
         },
-        
+
         async getTransferRequests() {
             return request('/transfers');
         },
-        
+
         async approveTransferRequest(requestId) {
             return request(`/transfers/${requestId}/approve`, 'POST');
         },
-        
+
         async rejectTransferRequest(requestId, reason) {
             return request(`/transfers/${requestId}/reject`, 'POST', { reason });
         },
@@ -81,7 +81,7 @@ const API = (function() {
         async rejectMoneyAdditionRequest(requestId, reason) {
             return request(`/money-addition-requests/${requestId}/reject`, 'POST', { reason });
         },
-        
+
         // Child management
         async updateChildBalance(childId, amount) {
             return request(`/children/${childId}/balance`, 'PUT', { amount });
@@ -99,12 +99,18 @@ const API = (function() {
             return request(`/children/${childId}/pin`, 'PUT', { pin });
         },
 
+            // Child preferences
+            async updateMyPreferences(preferences) {
+                return request('/children/me/preferences', 'PUT', preferences);
+            },
+
+
         // Username availability check
         async checkUsername(username) {
             const q = encodeURIComponent(username);
             return request(`/usernames/check?username=${q}`);
         },
-        
+
         // Goals endpoints (for future implementation)
         async createGoal(childId, name, targetAmount, deadline) {
             return request('/goals', 'POST', {
@@ -114,19 +120,19 @@ const API = (function() {
                 deadline
             });
         },
-        
+
         async getGoals(childId) {
             return request(`/goals/${childId}`);
         },
-        
+
         async updateGoal(goalId, updates) {
             return request(`/goals/${goalId}`, 'PUT', updates);
         },
-        
+
         async deleteGoal(goalId) {
             return request(`/goals/${goalId}`, 'DELETE');
         },
-        
+
         // Chores endpoints (for future implementation)
         async createChore(childId, name, reward, description) {
             return request('/chores', 'POST', {
@@ -136,24 +142,24 @@ const API = (function() {
                 description
             });
         },
-        
+
         async getChores(childId) {
             return request(`/chores/${childId}`);
         },
-        
+
         async completeChore(choreId) {
             return request(`/chores/${choreId}/complete`, 'POST');
         },
-        
+
         // Statistics endpoints
         async getStatistics(childId) {
             return request(`/statistics/${childId}`);
         },
-        
+
         async getFamilyStatistics() {
             return request('/statistics/family');
         },
-        
+
         // Expose request method for direct use if needed
         request: request
     };
@@ -163,4 +169,4 @@ const API = (function() {
 window.API = API;
 
 // Log when API module is loaded
-console.log('[API] Module loaded, using centralized Auth.request handler');
+// console.log('[API] Module loaded, using centralized Auth.request handler');

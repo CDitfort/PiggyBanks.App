@@ -67,6 +67,7 @@ const Auth = (function() {
             const token = getToken();
             const headers = {
                 'Content-Type': 'application/json',
+                'Accept': 'application/json',
                 [requestIdHeader]: requestId
             };
             
@@ -83,29 +84,38 @@ const Auth = (function() {
                 fetchOptions.body = JSON.stringify(body);
             }
             
-            console.log(`[Auth] API Request [${requestId}]:`, {
-                endpoint,
-                method,
-                hasBody: !!body,
-                hasToken: !!token
-            });
+            // console.log(`[Auth] API Request [${requestId}]:`, {
+            //     endpoint,
+            //     method,
+            //     hasBody: !!body,
+            //     hasToken: !!token
+            // });
             
             try {
                 const startTime = Date.now();
                 const response = await fetch(`${CONFIG.API_BASE_URL}${endpoint}`, fetchOptions);
-                const data = await response.json();
-                const duration = Date.now() - startTime;
-                
-                console.log(`[Auth] API Response [${requestId}]:`, {
-                    status: response.status,
-                    duration: `${duration}ms`,
-                    success: response.ok
-                });
-                
-                if (!response.ok) {
-                    throw new Error(data.error || 'Request failed');
+                // Safely parse JSON; handle empty or invalid JSON bodies gracefully
+                let data;
+                const text = await response.text();
+                try {
+                    data = text ? JSON.parse(text) : {};
+                } catch (parseErr) {
+                    console.warn(`[Auth] Non-JSON response [${requestId}] for ${endpoint}:`, text);
+                    data = { error: 'Unexpected response from server' };
                 }
-                
+                const duration = Date.now() - startTime;
+
+                // console.log(`[Auth] API Response [${requestId}]:`, {
+                //     status: response.status,
+                //     duration: `${duration}ms`,
+                //     success: response.ok
+                // });
+
+                if (!response.ok) {
+                    const msg = data && data.error ? data.error : (text || 'Request failed');
+                    throw new Error(msg);
+                }
+
                 return data;
             } catch (error) {
                 console.error(`[Auth] API Request failed [${requestId}]:`, error);
@@ -235,9 +245,9 @@ const Auth = (function() {
                 if (result.success) {
                     storeAuthData(result.token, result.user);
                     console.log('[Auth] Child login successful');
-                    return { success: true, message: result.message };
+                    return { success: true, message: result.message, user: result.user };
                 }
-                
+
                 return { success: false, error: result.error };
             } catch (error) {
                 console.error('[Auth] Child login error:', error);
@@ -341,13 +351,13 @@ const Auth = (function() {
         
         // For protected pages, verify authentication
         if (Auth.isAuthenticated()) {
-            console.log('[Auth] Protected page detected, verifying token...');
+            // console.log('[Auth] Protected page detected, verifying token...');
             const isValid = await Auth.verifyToken();
             if (!isValid) {
                 console.log('[Auth] Token invalid, redirecting to login');
                 window.location.href = CONFIG.ROUTES.LOGIN;
             } else {
-                console.log('[Auth] Token verified successfully');
+                // console.log('[Auth] Token verified successfully');
             }
         } else {
             console.log('[Auth] No authentication found on protected page, redirecting to login');
