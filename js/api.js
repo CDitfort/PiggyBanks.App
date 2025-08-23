@@ -101,7 +101,28 @@ const API = (function() {
 
             // Child preferences
             async updateMyPreferences(preferences) {
-                return request('/children/me/preferences', 'PUT', preferences);
+                // Add retry logic for preferences update due to occasional network issues
+                let lastError;
+                for (let attempt = 1; attempt <= 3; attempt++) {
+                    try {
+                        const result = await request('/children/me/preferences', 'PUT', preferences);
+                        return result;
+                    } catch (error) {
+                        lastError = error;
+                        console.warn(`[API] Preferences update attempt ${attempt} failed:`, error.message);
+
+                        // Don't retry on authentication errors
+                        if (error.message.includes('401') || error.message.includes('403')) {
+                            throw error;
+                        }
+
+                        // Wait before retrying (exponential backoff)
+                        if (attempt < 3) {
+                            await new Promise(resolve => setTimeout(resolve, attempt * 1000));
+                        }
+                    }
+                }
+                throw lastError;
             },
 
 

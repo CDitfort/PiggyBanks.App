@@ -47,7 +47,30 @@
                         <label for="confirmPassword">Confirm Password</label>
                         <input type="password" id="confirmPassword" name="confirmPassword" required placeholder="Confirm your password">
                     </div>
-                    
+
+                    <div class="form-group">
+                        <label for="securityQuestion">Security Question</label>
+                        <select id="securityQuestion" name="securityQuestion" required>
+                            <option value="">Choose a security question...</option>
+                            <option value="What was the name of your first pet?">What was the name of your first pet?</option>
+                            <option value="What is your mother's maiden name?">What is your mother's maiden name?</option>
+                            <option value="What city were you born in?">What city were you born in?</option>
+                            <option value="What was the name of your elementary school?">What was the name of your elementary school?</option>
+                            <option value="What is your favorite movie?">What is your favorite movie?</option>
+                            <option value="What was your childhood nickname?">What was your childhood nickname?</option>
+                            <option value="What is the name of the street you grew up on?">What is the name of the street you grew up on?</option>
+                            <option value="What was your first car?">What was your first car?</option>
+                            <option value="What is your favorite food?">What is your favorite food?</option>
+                            <option value="What was the name of your first boss?">What was the name of your first boss?</option>
+                        </select>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="securityAnswer">Security Answer</label>
+                        <input type="text" id="securityAnswer" name="securityAnswer" required placeholder="Enter your answer">
+                        <small class="form-hint">This will be used to reset your password if you forget it</small>
+                    </div>
+
                     <div class="error-message" id="errorMessage"></div>
                     <div class="success-message" id="successMessage"></div>
                     

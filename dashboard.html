@@ -15,7 +15,10 @@
                 <h1>🐷 Piggybanks.app</h1>
             </div>
             <div id="userName" class="welcome"></div>
-            <button id="logoutBtn" class="btn btn-secondary logout-btn">Logout</button>
+            <div class="header-actions">
+                <button id="parentSettingsBtn" class="btn btn-icon settings-btn" title="Account Settings" style="display: none;">⚙️</button>
+                <button id="logoutBtn" class="btn btn-secondary logout-btn">Logout</button>
+            </div>
         </header>
 
         <main class="dashboard-container">
@@ -419,6 +422,108 @@
                 <div class="confirm-actions" style="display:flex;gap:8px;justify-content:flex-end;margin-top:12px;">
                     <button id="confirmCancel" class="btn btn-secondary">Cancel</button>
                     <button id="confirmOk" class="btn btn-primary">OK</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Parent Settings Modal -->
+        <div id="parentSettingsModal" class="modal" style="display: none;">
+            <div class="modal-content parent-settings-modal">
+                <span class="close" id="parentSettingsClose">&times;</span>
+                <h2>Account Settings</h2>
+
+                <!-- Account Info Section -->
+                <div class="child-info-section">
+                    <div class="info-row">
+                        <strong>Name:</strong> <span id="settingsParentName"></span>
+                    </div>
+                    <div class="info-row">
+                        <strong>Email:</strong> <span id="settingsParentEmail"></span>
+                    </div>
+                </div>
+
+                <!-- Change Email Section -->
+                <div class="settings-section">
+                    <div class="section-toggle" id="changeEmailToggle">
+                        <span class="toggle-text">Change Email Address</span>
+                        <span class="toggle-arrow" id="changeEmailArrow">▶</span>
+                    </div>
+                    <div class="section-content" id="changeEmailSection" style="display: none;">
+                        <form id="changeEmailForm">
+                            <div class="form-group">
+                                <label for="newEmail">New Email Address</label>
+                                <input type="email" id="newEmail" name="newEmail" required placeholder="Enter new email">
+                            </div>
+                            <div class="form-group">
+                                <label for="emailSecurityAnswer">Security Answer</label>
+                                <input type="text" id="emailSecurityAnswer" name="emailSecurityAnswer" required placeholder="Answer your security question">
+                                <small class="form-hint">Answer to: <span id="emailSecurityQuestion"></span></small>
+                            </div>
+                            <div class="error-message" id="changeEmailError"></div>
+                            <div class="success-message" id="changeEmailSuccess"></div>
+                            <div class="modal-actions">
+                                <button type="submit" class="btn btn-primary">Update Email</button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+
+                <!-- Change Password Section -->
+                <div class="settings-section">
+                    <div class="section-toggle" id="changePasswordToggle">
+                        <span class="toggle-text">Change Password</span>
+                        <span class="toggle-arrow" id="changePasswordArrow">▶</span>
+                    </div>
+                    <div class="section-content" id="changePasswordSection" style="display: none;">
+                        <form id="changePasswordForm">
+                            <div class="form-group">
+                                <label for="newPassword">New Password</label>
+                                <input type="password" id="newPassword" name="newPassword" required placeholder="Enter new password (min 6 characters)">
+                            </div>
+                            <div class="form-group">
+                                <label for="confirmNewPassword">Confirm New Password</label>
+                                <input type="password" id="confirmNewPassword" name="confirmNewPassword" required placeholder="Confirm new password">
+                            </div>
+                            <div class="form-group">
+                                <label for="passwordSecurityAnswer">Security Answer</label>
+                                <input type="text" id="passwordSecurityAnswer" name="passwordSecurityAnswer" required placeholder="Answer your security question">
+                                <small class="form-hint">Answer to: <span id="passwordSecurityQuestion"></span></small>
+                            </div>
+                            <div class="error-message" id="changePasswordError"></div>
+                            <div class="success-message" id="changePasswordSuccess"></div>
+                            <div class="modal-actions">
+                                <button type="submit" class="btn btn-primary">Update Password</button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+
+                <!-- Delete Account Section -->
+                <div class="settings-section">
+                    <div class="section-toggle" id="deleteAccountToggle">
+                        <span class="toggle-text">Delete Account</span>
+                        <span class="toggle-arrow" id="deleteAccountArrow">▶</span>
+                    </div>
+                    <div class="section-content" id="deleteAccountSection" style="display: none;">
+                        <div class="security-warning">
+                            <p><em>⚠️ This action cannot be undone. Deleting your account will permanently remove:</em></p>
+                            <hr style="margin: 10px 0;">
+                            <ul style="margin: 10px 0; font-style: italic; font-size: 0.9em;">
+                                <li>Your parent account</li>
+                                <li>All child accounts</li>
+                                <li>All transaction history</li>
+                                <li>All savings goals</li>
+                                <li>All pending requests</li>
+                            </ul>
+                            <hr style="margin: 10px 0;">
+                        </div>
+                        <form id="deleteAccountForm">
+                            <div class="error-message" id="deleteAccountError"></div>
+                            <div class="modal-actions">
+                                <button type="submit" class="btn btn-danger" style="background: #ef4444 !important; color: white !important; border: 1px solid #dc2626 !important; padding: 12px 24px !important; border-radius: 8px !important; font-weight: 600 !important; cursor: pointer !important; transition: all 0.2s ease !important; display: inline-block !important; width: 180px !important; font-size: 14px !important; text-align: center !important; box-sizing: border-box !important;">Delete Account</button>
+                            </div>
+                        </form>
+                    </div>
                 </div>
             </div>
         </div>

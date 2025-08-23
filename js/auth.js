@@ -94,14 +94,37 @@ const Auth = (function() {
             try {
                 const startTime = Date.now();
                 const response = await fetch(`${CONFIG.API_BASE_URL}${endpoint}`, fetchOptions);
+
+                // Check if response is ok before trying to parse
+                if (!response.ok) {
+                    console.error(`[Auth] HTTP Error [${requestId}]:`, {
+                        status: response.status,
+                        statusText: response.statusText,
+                        url: response.url
+                    });
+                }
                 // Safely parse JSON; handle empty or invalid JSON bodies gracefully
                 let data;
                 const text = await response.text();
                 try {
                     data = text ? JSON.parse(text) : {};
                 } catch (parseErr) {
-                    console.warn(`[Auth] Non-JSON response [${requestId}] for ${endpoint}:`, text);
-                    data = { error: 'Unexpected response from server' };
+                    console.error(`[Auth] JSON Parse Error [${requestId}] for ${endpoint}:`, {
+                        error: parseErr.message,
+                        responseText: text.substring(0, 200), // First 200 chars for debugging
+                        status: response.status,
+                        statusText: response.statusText,
+                        contentType: response.headers.get('content-type')
+                    });
+
+                    // Check if this looks like an HTML error page
+                    if (text.trim().startsWith('<!DOCTYPE') || text.trim().startsWith('<html')) {
+                        data = { error: 'Server returned an error page. Please try again.' };
+                    } else if (text.includes('unexpected token')) {
+                        data = { error: 'Server response format error. Please try again.' };
+                    } else {
+                        data = { error: 'Unexpected response from server. Please try again.' };
+                    }
                 }
                 const duration = Date.now() - startTime;
 
@@ -188,12 +211,14 @@ const Auth = (function() {
         /**
          * Register a new parent account
          */
-        async register(name, email, password) {
+        async register(name, email, password, securityQuestion, securityAnswer) {
             try {
                 const result = await makeAuthRequest('/register', 'POST', {
                     name,
                     email,
-                    password
+                    password,
+                    securityQuestion,
+                    securityAnswer
                 });
                 
                 if (result.success) {

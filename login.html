@@ -97,6 +97,59 @@
             </div>
         </main>
 
+        <!-- Forgot Password Modal -->
+        <div id="forgotPasswordModal" class="modal" style="display: none;">
+            <div class="modal-content">
+                <span class="close" id="forgotPasswordClose">&times;</span>
+                <h3>Reset Your Password</h3>
+
+                <!-- Step 1: Email Verification -->
+                <div id="emailVerificationStep">
+                    <p>Enter your email address to get started:</p>
+                    <form id="emailVerificationForm">
+                        <div class="form-group">
+                            <label for="resetEmail">Email Address</label>
+                            <input type="email" id="resetEmail" name="resetEmail" required placeholder="Enter your email">
+                        </div>
+                        <div class="error-message" id="emailVerificationError"></div>
+                        <div class="modal-actions">
+                            <button type="button" class="btn btn-secondary" id="cancelEmailVerification">Cancel</button>
+                            <button type="submit" class="btn btn-primary">Continue</button>
+                        </div>
+                    </form>
+                </div>
+
+                <!-- Step 2: Security Question -->
+                <div id="securityQuestionStep" style="display: none;">
+                    <p>Please answer your security question:</p>
+                    <div class="security-question-display">
+                        <strong id="displaySecurityQuestion"></strong>
+                    </div>
+                    <form id="securityQuestionForm">
+                        <input type="hidden" id="verifiedEmail" name="verifiedEmail">
+                        <div class="form-group">
+                            <label for="securityAnswerInput">Your Answer</label>
+                            <input type="text" id="securityAnswerInput" name="securityAnswerInput" required placeholder="Enter your answer">
+                        </div>
+                        <div class="form-group">
+                            <label for="newPasswordInput">New Password</label>
+                            <input type="password" id="newPasswordInput" name="newPasswordInput" required placeholder="Enter new password (min 6 characters)">
+                        </div>
+                        <div class="form-group">
+                            <label for="confirmNewPasswordInput">Confirm New Password</label>
+                            <input type="password" id="confirmNewPasswordInput" name="confirmNewPasswordInput" required placeholder="Confirm new password">
+                        </div>
+                        <div class="error-message" id="securityQuestionError"></div>
+                        <div class="success-message" id="passwordResetSuccess"></div>
+                        <div class="modal-actions">
+                            <button type="button" class="btn btn-secondary" id="backToEmailStep">Back</button>
+                            <button type="submit" class="btn btn-primary">Reset Password</button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+
         <footer>
             <p>&copy; 2024 Piggybanks.app. All rights reserved.</p>
         </footer>

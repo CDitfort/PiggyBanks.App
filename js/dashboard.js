@@ -158,15 +158,27 @@ const progressFillEl = tipsPanel ? tipsPanel.querySelector('.tip-progress-fill')
     // Load content based on user role and hide loader when done
     try {
         if (user.role === 'parent') {
+            const settingsBtn = document.getElementById('parentSettingsBtn');
+            if (settingsBtn) {
+                settingsBtn.style.display = 'block';
+            }
+            // Hide main loading overlay immediately after showing dashboard
+            hideLoading();
             await loadParentDashboard();
+            setupParentSettings();
         } else if (user.role === 'child') {
+            const settingsBtn = document.getElementById('parentSettingsBtn');
+            if (settingsBtn) {
+                settingsBtn.style.display = 'none';
+            }
+            // Hide main loading overlay immediately after showing dashboard
+            hideLoading();
             await loadChildDashboard();
         }
     } catch (e) {
         console.error('[Dashboard] Failed to load dashboard', e);
-        showError();
-    } finally {
         hideLoading();
+        showError();
     }
 });
 
@@ -213,28 +225,23 @@ async function loadParentDashboard() {
         childDashboard.style.display = 'none';
     }
 
-    // Setup add child form
-    setupAddChildForm();
-
-    // Load children and pending approvals
-    await loadChildrenList();
-    await loadPendingApprovals();
-
-    // Setup modals
-    setupParentModals();
-
-    // Setup toasts and confirm modal
-    setupUXHelpers();
-
-    // Show dashboard now that data is loaded
+    // Show parent dashboard immediately to prevent blank screen
     if (parentDashboard) {
         parentDashboard.style.display = 'block';
     }
-    // Extra guard: hide any loading UI if still visible
-    const ls = document.getElementById('loadingState');
-    const lt = document.getElementById('dashboardLoadingTips');
-    if (ls) ls.style.display = 'none';
-    if (lt) lt.style.display = 'none';
+
+    // Setup add child form
+    setupAddChildForm();
+
+    // Setup modals and UX helpers first (non-async operations)
+    setupParentModals();
+    setupUXHelpers();
+
+    // Load data in parallel for better performance
+    await Promise.all([
+        loadChildrenList(),
+        loadPendingApprovals()
+    ]);
 }
 
 /**
@@ -421,7 +428,11 @@ async function loadChildDashboard() {
     if (parentDashboard) {
         parentDashboard.style.display = 'none';
     }
-    // Do not show child dashboard until data is loaded
+
+    // Show child dashboard immediately to prevent blank screen
+    if (childDashboard) {
+        childDashboard.style.display = 'block';
+    }
 
     // Display child's actual balance from user data and personalize headings
     const balanceElement = document.getElementById('childBalance');
@@ -595,8 +606,15 @@ async function loadChildDashboard() {
             modal.addEventListener('click', (e) => { if (e.target === modal) modal.style.display = 'none'; });
             saveBtn.addEventListener('click', async () => {
                 const base = colorInput.value;
+
+                // Disable save button to prevent double-clicks
+                saveBtn.disabled = true;
+                saveBtn.textContent = 'Saving...';
+
                 try {
+                    console.log('[Dashboard] Saving background color:', base);
                     const res = await API.updateMyPreferences({ backgroundColor: base });
+                    console.log('[Dashboard] Background color save response:', res);
                     if (res && res.success) {
                         const localUser = Auth.getUser() || {};
                         localUser.preferences = localUser.preferences || {};
@@ -611,11 +629,28 @@ async function loadChildDashboard() {
                         showToast('Background color saved', 'Your dashboard has been updated', 'success');
                         modal.style.display = 'none';
                     } else {
-                        showToast('Failed to save', (res && res.error) || 'Please try again', 'error');
+                        const errorMsg = (res && res.error) || 'Please try again';
+                        console.error('Save preferences failed:', res);
+                        showToast('Failed to save', errorMsg, 'error');
                     }
                 } catch (err) {
-                    console.error('Save preferences error', err);
-                    showToast('Failed to save', err.message || 'Please try again', 'error');
+                    console.error('Save preferences error:', err);
+                    let errorMsg = 'Please try again';
+
+                    // Provide more specific error messages
+                    if (err.message.includes('Server returned an error page')) {
+                        errorMsg = 'Server error. Please try again in a moment.';
+                    } else if (err.message.includes('response format error')) {
+                        errorMsg = 'Connection issue. Please try again.';
+                    } else if (err.message.includes('Failed to fetch')) {
+                        errorMsg = 'Network error. Please check your connection.';
+                    }
+
+                    showToast('Failed to save', errorMsg, 'error');
+                } finally {
+                    // Re-enable save button
+                    saveBtn.disabled = false;
+                    saveBtn.textContent = 'Save Color';
                 }
             });
         }
@@ -652,19 +687,11 @@ async function loadChildDashboard() {
     }
 
 
-    // Load pending requests then transaction history
-    await loadChildPendingRequests();
-    await loadChildTransactionHistory();
-
-    // Show dashboard now that data is loaded
-    if (childDashboard) {
-        childDashboard.style.display = 'block';
-    }
-    // Extra guard: hide any loading UI if still visible
-    const ls2 = document.getElementById('loadingState');
-    const lt2 = document.getElementById('dashboardLoadingTips');
-    if (ls2) ls2.style.display = 'none';
-    if (lt2) lt2.style.display = 'none';
+    // Load pending requests and transaction history in parallel
+    await Promise.all([
+        loadChildPendingRequests(),
+        loadChildTransactionHistory()
+    ]);
 }
 
 /**
@@ -839,6 +866,9 @@ async function loadPendingApprovals() {
     const approvalsContainer = document.getElementById('approvalsList');
     const pendingCount = document.getElementById('pendingRequests');
     if (!approvalsContainer) return;
+
+    // Show loading state
+    approvalsContainer.innerHTML = '<div class="loading-placeholder">Loading pending approvals...</div>';
 
     try {
         const [withdrawals, transfers, moneyAdditions] = await Promise.all([
@@ -1118,6 +1148,9 @@ async function loadChildrenList() {
 
     if (!childrenList) return;
 
+    // Show loading state
+    childrenList.innerHTML = '<div class="loading-placeholder">Loading children accounts...</div>';
+
     try {
         const result = await Auth.getChildren();
 
@@ -1162,7 +1195,7 @@ async function loadChildrenList() {
         }
     } catch (error) {
         console.error('Error loading children:', error);
-        childrenList.innerHTML = '<p class="error">Error loading children</p>';
+        childrenList.innerHTML = `<p class="error">Error loading children: ${error.message}</p>`;
     }
 }
 
@@ -1734,6 +1767,10 @@ function setupResetPinValidation() {
 async function loadChildPendingRequests() {
     const container = document.getElementById('childPendingList');
     if (!container) return;
+
+    // Show loading state
+    container.innerHTML = '<div class="loading-placeholder">Loading pending requests...</div>';
+
     try {
         const [withdrawals, transfers, moneyAdditions] = await Promise.all([
             API.getWithdrawalRequests(),
@@ -1875,6 +1912,9 @@ async function loadChildTransactionHistory() {
 
     const transactionList = document.getElementById('childTransactionList');
     if (!transactionList) return;
+
+    // Show loading state
+    transactionList.innerHTML = '<div class="loading-placeholder">Loading transaction history...</div>';
 
     try {
         const user = Auth.getUser();
@@ -2337,3 +2377,461 @@ style2.textContent = `
     }
 `;
 document.head.appendChild(style);
+
+/**
+ * Setup parent settings functionality
+ */
+function setupParentSettings() {
+    const settingsBtn = document.getElementById('parentSettingsBtn');
+    const settingsModal = document.getElementById('parentSettingsModal');
+    const settingsClose = document.getElementById('parentSettingsClose');
+
+    // Safety check - if elements don't exist, return early
+    if (!settingsBtn || !settingsModal || !settingsClose) {
+        console.warn('[Dashboard] Parent settings elements not found, skipping setup');
+        return;
+    }
+
+    // Get current user data
+    const user = Auth.getUser();
+    if (!user) return;
+
+    // Populate user info
+    const nameElement = document.getElementById('settingsParentName');
+    const emailElement = document.getElementById('settingsParentEmail');
+
+    if (nameElement) nameElement.textContent = user.name || '';
+    if (emailElement) emailElement.textContent = user.email || '';
+
+    // Set security question text in forms that require it
+    const securityQuestionSpans = [
+        'emailSecurityQuestion',
+        'passwordSecurityQuestion'
+    ];
+
+    // We'll need to fetch the security question from the server
+    // For now, we'll set a placeholder
+    securityQuestionSpans.forEach(id => {
+        const span = document.getElementById(id);
+        if (span) span.textContent = 'Loading...';
+    });
+
+    // Open settings modal
+    if (settingsBtn && settingsModal) {
+        settingsBtn.addEventListener('click', async () => {
+            settingsModal.style.display = 'flex';
+
+            // Reset all sections to closed
+            resetSettingsSections();
+
+            // Fetch and display security question
+            await loadSecurityQuestion();
+        });
+    }
+
+    // Close modal
+    if (settingsClose) {
+        settingsClose.addEventListener('click', () => {
+            settingsModal.style.display = 'none';
+        });
+    }
+
+    // Click outside modal to close
+    if (settingsModal) {
+        settingsModal.addEventListener('click', (e) => {
+            if (e.target === settingsModal) {
+                settingsModal.style.display = 'none';
+            }
+        });
+    }
+
+    // Setup section toggles
+    setupSectionToggles();
+
+    // Setup form handlers
+    setupSettingsForms();
+}
+
+/**
+ * Reset all settings sections to closed state
+ */
+function resetSettingsSections() {
+    const sections = [
+        { content: 'changeEmailSection', arrow: 'changeEmailArrow' },
+        { content: 'changePasswordSection', arrow: 'changePasswordArrow' },
+        { content: 'deleteAccountSection', arrow: 'deleteAccountArrow' }
+    ];
+
+    sections.forEach(section => {
+        const content = document.getElementById(section.content);
+        const arrow = document.getElementById(section.arrow);
+
+        if (content) content.style.display = 'none';
+        if (arrow) arrow.style.transform = 'rotate(0deg)';
+    });
+}
+
+/**
+ * Load security question from server
+ */
+async function loadSecurityQuestion() {
+    try {
+        const response = await fetch(`${CONFIG.API_BASE_URL}/parent/security-question`, {
+            method: 'GET',
+            headers: {
+                'Authorization': `Bearer ${Auth.getToken()}`
+            }
+        });
+
+        const result = await response.json();
+
+        if (result.success) {
+            const securityQuestionSpans = [
+                'emailSecurityQuestion',
+                'passwordSecurityQuestion'
+            ];
+
+            securityQuestionSpans.forEach(id => {
+                const span = document.getElementById(id);
+                if (span) span.textContent = result.securityQuestion;
+            });
+        } else {
+            console.error('Failed to load security question:', result.error);
+
+            // If user doesn't have security question, disable the forms and show message
+            const securityQuestionSpans = [
+                'emailSecurityQuestion',
+                'passwordSecurityQuestion'
+            ];
+
+            securityQuestionSpans.forEach(id => {
+                const span = document.getElementById(id);
+                if (span) span.textContent = 'Security question not set up';
+            });
+
+            // Disable the forms (only email and password forms require security question)
+            const forms = ['changeEmailForm', 'changePasswordForm'];
+            forms.forEach(formId => {
+                const form = document.getElementById(formId);
+                if (form) {
+                    const inputs = form.querySelectorAll('input, button');
+                    inputs.forEach(input => input.disabled = true);
+
+                    // Show error message
+                    let errorType = '';
+                    if (formId === 'changeEmailForm') errorType = 'changeEmail';
+                    else if (formId === 'changePasswordForm') errorType = 'changePassword';
+
+                    if (errorType) {
+                        showSettingsError(errorType, 'Security question setup required. Please contact support.');
+                    }
+                }
+            });
+        }
+    } catch (error) {
+        console.error('Failed to load security question:', error);
+    }
+}
+
+/**
+ * Setup section toggle functionality
+ */
+function setupSectionToggles() {
+    const toggles = [
+        { toggle: 'changeEmailToggle', content: 'changeEmailSection', arrow: 'changeEmailArrow' },
+        { toggle: 'changePasswordToggle', content: 'changePasswordSection', arrow: 'changePasswordArrow' },
+        { toggle: 'deleteAccountToggle', content: 'deleteAccountSection', arrow: 'deleteAccountArrow' }
+    ];
+
+    toggles.forEach(item => {
+        const toggle = document.getElementById(item.toggle);
+        const content = document.getElementById(item.content);
+        const arrow = document.getElementById(item.arrow);
+
+        if (toggle && content && arrow) {
+            toggle.addEventListener('click', () => {
+                const isOpen = content.style.display === 'block';
+
+                // Close all sections first
+                resetSettingsSections();
+
+                // Open this section if it was closed
+                if (!isOpen) {
+                    content.style.display = 'block';
+                    arrow.style.transform = 'rotate(90deg)';
+                }
+            });
+        }
+    });
+}
+
+/**
+ * Setup settings form handlers
+ */
+function setupSettingsForms() {
+    // Change Email Form
+    const changeEmailForm = document.getElementById('changeEmailForm');
+    if (changeEmailForm) {
+        changeEmailForm.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            await handleChangeEmail(e);
+        });
+    }
+
+    // Change Password Form
+    const changePasswordForm = document.getElementById('changePasswordForm');
+    if (changePasswordForm) {
+        changePasswordForm.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            await handleChangePassword(e);
+        });
+    }
+
+    // Delete Account Form
+    const deleteAccountForm = document.getElementById('deleteAccountForm');
+    if (deleteAccountForm) {
+        deleteAccountForm.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            await handleDeleteAccount(e);
+        });
+    }
+}
+
+/**
+ * Handle change email form submission
+ */
+async function handleChangeEmail(e) {
+    const formData = new FormData(e.target);
+    const newEmail = formData.get('newEmail').trim().toLowerCase();
+    const securityAnswer = formData.get('emailSecurityAnswer').trim();
+
+    // Clear previous messages
+    clearSettingsMessages('changeEmail');
+
+    if (!newEmail || !securityAnswer) {
+        showSettingsError('changeEmail', 'All fields are required');
+        return;
+    }
+
+    // Email validation
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(newEmail)) {
+        showSettingsError('changeEmail', 'Invalid email format');
+        return;
+    }
+
+    try {
+        setSettingsLoading('changeEmail', true);
+
+        const response = await fetch(`${CONFIG.API_BASE_URL}/parent/email`, {
+            method: 'PUT',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${Auth.getToken()}`
+            },
+            body: JSON.stringify({ newEmail, securityAnswer })
+        });
+
+        const result = await response.json();
+
+        if (result.success) {
+            showSettingsSuccess('changeEmail', 'Email updated successfully! Please log in again with your new email.');
+
+            // Update displayed email
+            document.getElementById('settingsParentEmail').textContent = newEmail;
+
+            // Clear form
+            e.target.reset();
+
+            // Logout after 3 seconds
+            setTimeout(() => {
+                Auth.logout();
+            }, 3000);
+        } else {
+            showSettingsError('changeEmail', result.error || 'Failed to update email');
+        }
+    } catch (error) {
+        console.error('Change email error:', error);
+        showSettingsError('changeEmail', 'An unexpected error occurred');
+    } finally {
+        setSettingsLoading('changeEmail', false);
+    }
+}
+
+/**
+ * Handle change password form submission
+ */
+async function handleChangePassword(e) {
+    const formData = new FormData(e.target);
+    const newPassword = formData.get('newPassword');
+    const confirmPassword = formData.get('confirmNewPassword');
+    const securityAnswer = formData.get('passwordSecurityAnswer').trim();
+
+    // Clear previous messages
+    clearSettingsMessages('changePassword');
+
+    if (!newPassword || !confirmPassword || !securityAnswer) {
+        showSettingsError('changePassword', 'All fields are required');
+        return;
+    }
+
+    if (newPassword.length < 6) {
+        showSettingsError('changePassword', 'Password must be at least 6 characters long');
+        return;
+    }
+
+    if (newPassword !== confirmPassword) {
+        showSettingsError('changePassword', 'Passwords do not match');
+        return;
+    }
+
+    try {
+        setSettingsLoading('changePassword', true);
+
+        const response = await fetch(`${CONFIG.API_BASE_URL}/parent/password`, {
+            method: 'PUT',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${Auth.getToken()}`
+            },
+            body: JSON.stringify({ newPassword, securityAnswer })
+        });
+
+        const result = await response.json();
+
+        if (result.success) {
+            showSettingsSuccess('changePassword', 'Password updated successfully!');
+
+            // Clear form
+            e.target.reset();
+        } else {
+            showSettingsError('changePassword', result.error || 'Failed to update password');
+        }
+    } catch (error) {
+        console.error('Change password error:', error);
+        showSettingsError('changePassword', 'An unexpected error occurred');
+    } finally {
+        setSettingsLoading('changePassword', false);
+    }
+}
+
+/**
+ * Handle delete account form submission
+ */
+async function handleDeleteAccount(e) {
+    // Clear previous messages
+    clearSettingsMessages('deleteAccount');
+
+    // Close the settings modal before showing confirmation dialogs
+    const settingsModal = document.getElementById('parentSettingsModal');
+    if (settingsModal) {
+        settingsModal.style.display = 'none';
+    }
+
+    // Double confirmation
+    const firstConfirm = await openConfirm({
+        title: 'Delete Account',
+        message: 'Are you sure you want to delete your account? This action cannot be undone and will permanently delete all your data and your children\'s accounts.',
+        okText: 'Yes, Delete'
+    });
+
+    if (!firstConfirm) return;
+
+    const secondConfirm = await openInputConfirm({
+        title: 'Type to confirm',
+        message: 'Please type DELETE to confirm account deletion',
+        requiredValue: 'DELETE',
+        okText: 'Delete Account'
+    });
+
+    if (!secondConfirm) {
+        showSettingsError('deleteAccount', 'Account deletion cancelled');
+        return;
+    }
+
+    try {
+        setSettingsLoading('deleteAccount', true);
+
+        const response = await fetch(`${CONFIG.API_BASE_URL}/parent/account`, {
+            method: 'DELETE',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${Auth.getToken()}`
+            }
+        });
+
+        const result = await response.json();
+
+        if (result.success) {
+            showToast('Account Deleted', 'Your account has been permanently deleted', 'success');
+
+            // Redirect to home page after 2 seconds
+            setTimeout(() => {
+                Auth.logout();
+            }, 2000);
+        } else {
+            showSettingsError('deleteAccount', result.error || 'Failed to delete account');
+        }
+    } catch (error) {
+        console.error('Delete account error:', error);
+        showSettingsError('deleteAccount', 'An unexpected error occurred');
+    } finally {
+        setSettingsLoading('deleteAccount', false);
+    }
+}
+
+/**
+ * Helper functions for settings forms
+ */
+function clearSettingsMessages(formType) {
+    const errorElement = document.getElementById(`${formType}Error`);
+    const successElement = document.getElementById(`${formType}Success`);
+
+    if (errorElement) {
+        errorElement.textContent = '';
+        errorElement.style.display = 'none';
+    }
+    if (successElement) {
+        successElement.textContent = '';
+        successElement.style.display = 'none';
+    }
+}
+
+function showSettingsError(formType, message) {
+    const errorElement = document.getElementById(`${formType}Error`);
+    if (errorElement) {
+        errorElement.textContent = message;
+        errorElement.style.display = 'block';
+    }
+}
+
+function showSettingsSuccess(formType, message) {
+    const successElement = document.getElementById(`${formType}Success`);
+    if (successElement) {
+        successElement.textContent = message;
+        successElement.style.display = 'block';
+    }
+}
+
+function setSettingsLoading(formType, loading) {
+    const form = document.getElementById(`${formType}Form`);
+    const submitButton = form?.querySelector('button[type="submit"]');
+
+    if (submitButton) {
+        submitButton.disabled = loading;
+
+        const originalText = {
+            'changeEmail': 'Update Email',
+            'changePassword': 'Update Password',
+            'deleteAccount': 'Delete Account'
+        };
+
+        const loadingText = {
+            'changeEmail': 'Updating...',
+            'changePassword': 'Updating...',
+            'deleteAccount': 'Deleting...'
+        };
+
+        submitButton.textContent = loading ? loadingText[formType] : originalText[formType];
+    }
+}

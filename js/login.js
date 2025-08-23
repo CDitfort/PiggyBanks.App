@@ -422,6 +422,237 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   }
 
+  // Forgot Password functionality
+  const forgotPasswordLink = document.querySelector('.forgot-password');
+  const forgotPasswordModal = document.getElementById('forgotPasswordModal');
+  const forgotPasswordClose = document.getElementById('forgotPasswordClose');
+  const emailVerificationStep = document.getElementById('emailVerificationStep');
+  const securityQuestionStep = document.getElementById('securityQuestionStep');
+  const emailVerificationForm = document.getElementById('emailVerificationForm');
+  const securityQuestionForm = document.getElementById('securityQuestionForm');
+  const cancelEmailVerification = document.getElementById('cancelEmailVerification');
+  const backToEmailStep = document.getElementById('backToEmailStep');
+
+  // Open forgot password modal
+  if (forgotPasswordLink && forgotPasswordModal) {
+    forgotPasswordLink.addEventListener('click', (e) => {
+      e.preventDefault();
+      forgotPasswordModal.style.display = 'flex';
+      emailVerificationStep.style.display = 'block';
+      securityQuestionStep.style.display = 'none';
+      // Clear forms
+      emailVerificationForm.reset();
+      securityQuestionForm.reset();
+      // Clear messages
+      clearForgotPasswordMessages();
+    });
+  }
+
+  // Close modal
+  if (forgotPasswordClose) {
+    forgotPasswordClose.addEventListener('click', () => {
+      forgotPasswordModal.style.display = 'none';
+    });
+  }
+
+  if (cancelEmailVerification) {
+    cancelEmailVerification.addEventListener('click', () => {
+      forgotPasswordModal.style.display = 'none';
+    });
+  }
+
+  // Click outside modal to close
+  if (forgotPasswordModal) {
+    forgotPasswordModal.addEventListener('click', (e) => {
+      if (e.target === forgotPasswordModal) {
+        forgotPasswordModal.style.display = 'none';
+      }
+    });
+  }
+
+  // Back to email step
+  if (backToEmailStep) {
+    backToEmailStep.addEventListener('click', () => {
+      emailVerificationStep.style.display = 'block';
+      securityQuestionStep.style.display = 'none';
+      clearForgotPasswordMessages();
+    });
+  }
+
+  // Email verification form handler
+  if (emailVerificationForm) {
+    emailVerificationForm.addEventListener('submit', async (e) => {
+      e.preventDefault();
+
+      const formData = new FormData(emailVerificationForm);
+      const email = formData.get('resetEmail').trim().toLowerCase();
+
+      if (!email) {
+        showEmailVerificationError('Email is required');
+        return;
+      }
+
+      try {
+        setEmailVerificationLoading(true);
+        const response = await fetch(`${CONFIG.API_BASE_URL}/forgot-password/verify-email`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ email })
+        });
+
+        const result = await response.json();
+
+        if (result.success) {
+          // Move to security question step
+          document.getElementById('displaySecurityQuestion').textContent = result.securityQuestion;
+          document.getElementById('verifiedEmail').value = email;
+          emailVerificationStep.style.display = 'none';
+          securityQuestionStep.style.display = 'block';
+          clearForgotPasswordMessages();
+        } else {
+          showEmailVerificationError(result.error || 'Email not found');
+        }
+      } catch (error) {
+        console.error('Email verification error:', error);
+        showEmailVerificationError('An unexpected error occurred. Please try again.');
+      } finally {
+        setEmailVerificationLoading(false);
+      }
+    });
+  }
+
+  // Security question form handler
+  if (securityQuestionForm) {
+    securityQuestionForm.addEventListener('submit', async (e) => {
+      e.preventDefault();
+
+      const formData = new FormData(securityQuestionForm);
+      const email = formData.get('verifiedEmail');
+      const securityAnswer = formData.get('securityAnswerInput').trim();
+      const newPassword = formData.get('newPasswordInput');
+      const confirmPassword = formData.get('confirmNewPasswordInput');
+
+      if (!securityAnswer) {
+        showSecurityQuestionError('Security answer is required');
+        return;
+      }
+
+      if (!newPassword) {
+        showSecurityQuestionError('New password is required');
+        return;
+      }
+
+      if (newPassword.length < 6) {
+        showSecurityQuestionError('Password must be at least 6 characters long');
+        return;
+      }
+
+      if (newPassword !== confirmPassword) {
+        showSecurityQuestionError('Passwords do not match');
+        return;
+      }
+
+      try {
+        setSecurityQuestionLoading(true);
+        const response = await fetch(`${CONFIG.API_BASE_URL}/forgot-password/reset`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            email,
+            securityAnswer,
+            newPassword
+          })
+        });
+
+        const result = await response.json();
+
+        if (result.success) {
+          showPasswordResetSuccess('Password reset successfully! You can now login with your new password.');
+          setTimeout(() => {
+            forgotPasswordModal.style.display = 'none';
+            // Focus on login form
+            const emailInput = document.getElementById('parentEmail');
+            if (emailInput) {
+              emailInput.value = email;
+              emailInput.focus();
+            }
+          }, 3000);
+        } else {
+          showSecurityQuestionError(result.error || 'Failed to reset password');
+        }
+      } catch (error) {
+        console.error('Password reset error:', error);
+        showSecurityQuestionError('An unexpected error occurred. Please try again.');
+      } finally {
+        setSecurityQuestionLoading(false);
+      }
+    });
+  }
+
+  // Helper functions for forgot password
+  function clearForgotPasswordMessages() {
+    const emailError = document.getElementById('emailVerificationError');
+    const securityError = document.getElementById('securityQuestionError');
+    const successMessage = document.getElementById('passwordResetSuccess');
+
+    if (emailError) {
+      emailError.textContent = '';
+      emailError.style.display = 'none';
+    }
+    if (securityError) {
+      securityError.textContent = '';
+      securityError.style.display = 'none';
+    }
+    if (successMessage) {
+      successMessage.textContent = '';
+      successMessage.style.display = 'none';
+    }
+  }
+
+  function showEmailVerificationError(message) {
+    const errorElement = document.getElementById('emailVerificationError');
+    if (errorElement) {
+      errorElement.textContent = message;
+      errorElement.style.display = 'block';
+    }
+  }
+
+  function showSecurityQuestionError(message) {
+    const errorElement = document.getElementById('securityQuestionError');
+    if (errorElement) {
+      errorElement.textContent = message;
+      errorElement.style.display = 'block';
+    }
+  }
+
+  function showPasswordResetSuccess(message) {
+    const successElement = document.getElementById('passwordResetSuccess');
+    if (successElement) {
+      successElement.textContent = message;
+      successElement.style.display = 'block';
+    }
+  }
+
+  function setEmailVerificationLoading(loading) {
+    const submitButton = emailVerificationForm.querySelector('button[type="submit"]');
+    if (submitButton) {
+      submitButton.disabled = loading;
+      submitButton.textContent = loading ? 'Verifying...' : 'Continue';
+    }
+  }
+
+  function setSecurityQuestionLoading(loading) {
+    const submitButton = securityQuestionForm.querySelector('button[type="submit"]');
+    if (submitButton) {
+      submitButton.disabled = loading;
+      submitButton.textContent = loading ? 'Resetting...' : 'Reset Password';
+    }
+  }
+
   console.log('[Login] Event handlers attached successfully');
 });
 

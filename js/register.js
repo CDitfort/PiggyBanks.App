@@ -23,9 +23,11 @@ document.addEventListener('DOMContentLoaded', () => {
         const email = formData.get('email').trim().toLowerCase();
         const password = formData.get('password');
         const confirmPassword = formData.get('confirmPassword');
-        
+        const securityQuestion = formData.get('securityQuestion');
+        const securityAnswer = formData.get('securityAnswer').trim();
+
         // Validate form
-        if (!name || !email || !password || !confirmPassword) {
+        if (!name || !email || !password || !confirmPassword || !securityQuestion || !securityAnswer) {
             showError('All fields are required');
             return;
         }
@@ -39,13 +41,18 @@ document.addEventListener('DOMContentLoaded', () => {
             showError('Password must be at least 6 characters long');
             return;
         }
+
+        if (securityAnswer.length < 2) {
+            showError('Security answer must be at least 2 characters long');
+            return;
+        }
         
         // Disable form during submission
         setFormLoading(true);
         
         try {
             // Call registration API
-            const result = await Auth.register(name, email, password);
+            const result = await Auth.register(name, email, password, securityQuestion, securityAnswer);
             
             if (result.success) {
                 showSuccess('Account created successfully! Redirecting to dashboard...');
