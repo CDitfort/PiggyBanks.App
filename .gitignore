@@ -71,3 +71,6 @@ node_modules/
 # Firebase runtime config (contains secrets) - CRITICAL
 functions/.runtimeconfig.json
 
+
+# Backend files (local development only)
+functions/
