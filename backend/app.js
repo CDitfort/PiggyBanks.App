@@ -32,7 +32,8 @@ function createApp({ mongoUri, jwtSecret }) {
   app.use(express.json());
 
   // Preflight
-  app.options('*', (req, res) => {
+  // Express 5 (path-to-regexp v6): use a named splat parameter to catch all paths
+  app.options('/:path(*)', (req, res) => {
     res.set('Access-Control-Allow-Origin', '*');
     res.set('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
     res.set('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Requested-With, x-request-id');
