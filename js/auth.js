@@ -240,7 +240,8 @@ const Auth = (function() {
                 console.log('[Auth] Parent login attempt for:', email);
                 const result = await makeAuthRequest('/login', 'POST', {
                     email,
-                    password
+                    password,
+                    role: 'parent'
                 });
                 
                 if (result.success) {
@@ -264,7 +265,8 @@ const Auth = (function() {
                 console.log('[Auth] Child login attempt for:', username);
                 const result = await makeAuthRequest('/login', 'POST', {
                     username,
-                    pin
+                    pin,
+                    role: 'child'
                 });
                 
                 if (result.success) {

@@ -30,15 +30,20 @@ function createApp({ mongoUri, jwtSecret }) {
 
   app.use(cors({ origin: true }));
   app.use(express.json());
+  // Also accept URL-encoded bodies (in case some environments send form-encoded data)
+  app.use(express.urlencoded({ extended: true }));
 
   // Preflight
-  // Express 5 (path-to-regexp v6): use a named splat parameter to catch all paths
-  app.options('/:path(*)', (req, res) => {
-    res.set('Access-Control-Allow-Origin', '*');
-    res.set('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
-    res.set('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Requested-With, x-request-id');
-    res.set('Access-Control-Max-Age', '86400');
-    res.status(204).send('');
+  // Handle CORS preflight globally without path patterns (Express 5 safe)
+  app.use((req, res, next) => {
+    if (req.method === 'OPTIONS') {
+      res.set('Access-Control-Allow-Origin', '*');
+      res.set('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
+      res.set('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Requested-With, x-request-id');
+      res.set('Access-Control-Max-Age', '86400');
+      return res.status(204).send('');
+    }
+    next();
   });
 
   // Helpers
