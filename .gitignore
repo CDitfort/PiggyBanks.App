@@ -71,6 +71,17 @@ node_modules/
 # Firebase runtime config (contains secrets) - CRITICAL
 functions/.runtimeconfig.json
 
+# Local env files (never commit secrets)
+.env
+.env.*
+!.env.example
 
-# Backend files (local development only)
-functions/
+# Local Netlify folder
+.netlify
+
+# Firebase emulators local state
+.firebase/
+
+# Build caches/artifacts (if any appear later)
+.cache/
+dist/
