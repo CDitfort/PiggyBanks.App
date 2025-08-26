@@ -166,6 +166,7 @@ const progressFillEl = tipsPanel ? tipsPanel.querySelector('.tip-progress-fill')
             hideLoading();
             await loadParentDashboard();
             setupParentSettings();
+            startParentRealtimeUpdates();
         } else if (user.role === 'child') {
             const settingsBtn = document.getElementById('parentSettingsBtn');
             if (settingsBtn) {
@@ -174,6 +175,7 @@ const progressFillEl = tipsPanel ? tipsPanel.querySelector('.tip-progress-fill')
             // Hide main loading overlay immediately after showing dashboard
             hideLoading();
             await loadChildDashboard();
+            startChildRealtimeUpdates();
         }
     } catch (e) {
         console.error('[Dashboard] Failed to load dashboard', e);
@@ -291,14 +293,29 @@ function setupUXHelpers() {
 
             confirmModal.style.display = 'flex';
 
+            let downOnBackdrop = false;
+            const onMouseDown = (e) => { downOnBackdrop = (e.target === confirmModal); };
+            const onTouchStart = (e) => { downOnBackdrop = (e.target === confirmModal); };
+            const onBackdropClick = (e) => {
+                if (e.target === confirmModal && downOnBackdrop) {
+                    cleanup(); resolve(false);
+                }
+                downOnBackdrop = false;
+            };
+
             const cleanup = () => {
                 btnOk.onclick = null;
                 btnCancel.onclick = null;
+                confirmModal.removeEventListener('mousedown', onMouseDown);
+                confirmModal.removeEventListener('touchstart', onTouchStart);
+                confirmModal.removeEventListener('click', onBackdropClick);
                 confirmModal.style.display = 'none';
             };
             btnOk.onclick = () => { cleanup(); resolve(true); };
             btnCancel.onclick = () => { cleanup(); resolve(false); };
-            confirmModal.onclick = (e) => { if (e.target === confirmModal) { cleanup(); resolve(false); } };
+            confirmModal.addEventListener('mousedown', onMouseDown);
+            confirmModal.addEventListener('touchstart', onTouchStart, { passive: true });
+            confirmModal.addEventListener('click', onBackdropClick);
         });
     };
 }
@@ -350,11 +367,23 @@ window.openInputConfirm = ({ title = 'Confirm', message = 'Type to confirm', pla
         modal.style.display = 'flex';
         inputEl.focus();
 
+        let downOnBackdrop = false;
+        const onMouseDown = (e) => { downOnBackdrop = (e.target === modal); };
+        const onTouchStart = (e) => { downOnBackdrop = (e.target === modal); };
+        const onBackdropClick = (e) => {
+            if (e.target === modal && downOnBackdrop) {
+                cleanup(); resolve(false);
+            }
+            downOnBackdrop = false;
+        };
+
         const cleanup = () => {
             inputEl.oninput = null;
             okBtn.onclick = null;
             cancelBtn.onclick = null;
-            modal.onclick = null;
+            modal.removeEventListener('mousedown', onMouseDown);
+            modal.removeEventListener('touchstart', onTouchStart);
+            modal.removeEventListener('click', onBackdropClick);
             modal.style.display = 'none';
         };
         inputEl.oninput = () => {
@@ -363,7 +392,9 @@ window.openInputConfirm = ({ title = 'Confirm', message = 'Type to confirm', pla
         };
         okBtn.onclick = () => { const ok = !requiredValue || inputEl.value.trim() === requiredValue; cleanup(); resolve(ok); };
         cancelBtn.onclick = () => { cleanup(); resolve(false); };
-        modal.onclick = (e) => { if (e.target === modal) { cleanup(); resolve(false); } };
+        modal.addEventListener('mousedown', onMouseDown);
+        modal.addEventListener('touchstart', onTouchStart, { passive: true });
+        modal.addEventListener('click', onBackdropClick);
     });
 };
 
@@ -406,15 +437,29 @@ window.openTextPrompt = ({ title = 'Reason', message = '', placeholder = 'Option
         modal.style.display = 'flex';
         inputEl.focus();
 
+        let downOnBackdrop = false;
+        const onMouseDown = (e) => { downOnBackdrop = (e.target === modal); };
+        const onTouchStart = (e) => { downOnBackdrop = (e.target === modal); };
+        const onBackdropClick = (e) => {
+            if (e.target === modal && downOnBackdrop) {
+                cleanup(); resolve({ value: '', cancelled: true });
+            }
+            downOnBackdrop = false;
+        };
+
         const cleanup = () => {
             okBtn.onclick = null;
             cancelBtn.onclick = null;
-            modal.onclick = null;
+            modal.removeEventListener('mousedown', onMouseDown);
+            modal.removeEventListener('touchstart', onTouchStart);
+            modal.removeEventListener('click', onBackdropClick);
             modal.style.display = 'none';
         };
         okBtn.onclick = () => { const val = inputEl.value.trim(); cleanup(); resolve({ value: val, cancelled: false }); };
         cancelBtn.onclick = () => { cleanup(); resolve({ value: '', cancelled: true }); };
-        modal.onclick = (e) => { if (e.target === modal) { cleanup(); resolve({ value: '', cancelled: true }); } };
+        modal.addEventListener('mousedown', onMouseDown);
+        modal.addEventListener('touchstart', onTouchStart, { passive: true });
+        modal.addEventListener('click', onBackdropClick);
     });
 };
 
@@ -603,7 +648,10 @@ async function loadChildDashboard() {
                 }
             });
             closeBtn.addEventListener('click', () => { modal.style.display = 'none'; });
-            modal.addEventListener('click', (e) => { if (e.target === modal) modal.style.display = 'none'; });
+            let downOnBackdrop = false;
+            modal.addEventListener('mousedown', (e) => { downOnBackdrop = (e.target === modal); });
+            modal.addEventListener('touchstart', (e) => { downOnBackdrop = (e.target === modal); }, { passive: true });
+            modal.addEventListener('click', (e) => { if (e.target === modal && downOnBackdrop) modal.style.display = 'none'; downOnBackdrop = false; });
             saveBtn.addEventListener('click', async () => {
                 const base = colorInput.value;
 
@@ -752,7 +800,42 @@ function setupAddChildForm() {
                 const addChildModalEl = document.getElementById('addChildModal');
                 if (addChildModalEl) addChildModalEl.style.display = 'none';
                 form.reset();
-                await loadChildrenList();
+
+                const child = result.child || { id: '', name, username, savings: initialBalance || 0 };
+                const list = document.getElementById('childrenList');
+                if (list) {
+                    const empty = list.querySelector('.children-empty');
+                    if (empty) list.innerHTML = '';
+                    list.insertAdjacentHTML('beforeend', `
+                        <div class="child-card sleek vertical" data-child-id="${child.id}">
+                            <div class="card-header">
+                                <button class="settings-btn" onclick="openChildSettings('${child.id}','${child.name}','${child.username}')">⚙️</button>
+                            </div>
+                            <div class="child-info">
+                                <h3 class="child-name" title="Name">${child.name}</h3>
+
+                                <div class="balance-display" title="Account Balance">
+                                    <div class="balance-amount">$${(child.savings || 0).toFixed(2)}</div>
+                                </div>
+                            </div>
+                            <div class="actions-column" style="display:flex; gap:8px; flex-wrap:wrap;">
+                                <button class="btn btn-primary action-btn" onclick="addMoney('${child.id}', '${child.name}')">Add Money</button>
+                                <button class="btn btn-secondary action-btn" onclick="removeMoney('${child.id}', '${child.name}')">Remove Money</button>
+                                <button class="btn btn-secondary action-btn" onclick="viewHistory('${child.id}', '${child.name}')">History</button>
+                            </div>
+                        </div>
+                    `);
+                }
+                const totalChildrenElement = document.getElementById('totalChildren');
+                if (totalChildrenElement) {
+                    const n = parseInt(totalChildrenElement.textContent || '0', 10) || 0;
+                    totalChildrenElement.textContent = String(n + 1);
+                }
+                const totalBalanceElement = document.getElementById('totalBalance');
+                if (totalBalanceElement) {
+                    const tb = parseFloat(totalBalanceElement.textContent || '0') || 0;
+                    totalBalanceElement.textContent = (tb + (Number(child.savings) || 0)).toFixed(2);
+                }
             } else {
                 showToast('Failed to create child', result.error || 'Please try again', 'error');
             }
@@ -862,13 +945,21 @@ function setupAddChildRealTimeValidation(form) {
 /**
  * Load pending approvals for parent
  */
-async function loadPendingApprovals() {
+async function loadPendingApprovals(options = {}) {
     const approvalsContainer = document.getElementById('approvalsList');
     const pendingCount = document.getElementById('pendingRequests');
     if (!approvalsContainer) return;
 
-    // Show loading state
-    approvalsContainer.innerHTML = '<div class="loading-placeholder">Loading pending approvals...</div>';
+    // If user is editing or has an unsaved edited amount, skip soft refresh to preserve state
+    if (options.soft) {
+        const busyRow = approvalsContainer.querySelector('.approval-item[data-editing="true"], .approval-item[data-edited="true"]');
+        if (busyRow) return;
+    }
+
+    // Show loading state (skip for soft refresh to avoid flicker)
+    if (!options.soft) {
+        approvalsContainer.innerHTML = '<div class="loading-placeholder">Loading pending approvals...</div>';
+    }
 
     try {
         const [withdrawals, transfers, moneyAdditions] = await Promise.all([
@@ -883,8 +974,8 @@ async function loadPendingApprovals() {
                 .filter(r => r.status === 'pending')
                 .forEach(r => items.push({
                     kind: 'withdrawal',
-                    id: r._id || r.id,
-                    childId: r.childId,
+                    id: String(r._id || r.id),
+                    childId: r.userId,
                     amount: r.amount,
                     reason: r.reason,
                     date: r.createdAt
@@ -895,9 +986,9 @@ async function loadPendingApprovals() {
                 .filter(r => r.status === 'pending')
                 .forEach(r => items.push({
                     kind: 'transfer',
-                    id: r._id || r.id,
-                    fromChildId: r.fromChildId,
-                    toChildId: r.toChildId,
+                    id: String(r._id || r.id),
+                    fromChildId: r.fromUserId,
+                    toChildId: r.toUserId,
                     amount: r.amount,
                     reason: r.reason,
                     date: r.createdAt
@@ -908,8 +999,8 @@ async function loadPendingApprovals() {
                 .filter(r => r.status === 'pending')
                 .forEach(r => items.push({
                     kind: 'money_addition',
-                    id: r._id || r.id,
-                    childId: r.childId,
+                    id: String(r._id || r.id),
+                    childId: r.userId,
                     amount: r.amount,
                     reason: r.reason,
                     date: r.createdAt
@@ -974,16 +1065,23 @@ async function loadPendingApprovals() {
                     approveAction = `approveMoneyAddition('${item.id}')`;
                     rejectAction = `rejectMoneyAdditionPrompt('${item.id}')`;
                 }
+                const edited = (window.__approvalEdits && window.__approvalEdits[item.id] != null);
+                const displayAmount = edited ? Number(window.__approvalEdits[item.id]) : Number(item.amount);
                 return `
-                    <div class="approval-item">
+                    <div class="approval-item" data-kind="${item.kind}" data-id="${item.id}" data-child-id="${item.childId || ''}" data-from-child-id="${item.fromChildId || ''}" data-to-child-id="${item.toChildId || ''}" ${edited ? 'data-edited="true"' : ''}>
                         <div class="approval-details">
-                            <div class="approval-title">${label} - $${Number(item.amount).toFixed(2)}</div>
+                            <div class="approval-title">
+                                ${label} -
+                                <span class="approval-amount-text">$${displayAmount.toFixed(2)}</span>
+                                <input type="number" step="0.01" min="0.01" class="approval-amount-input" value="${displayAmount.toFixed(2)}" style="display:none; width: 90px; margin-left: 6px;" />
+                            </div>
                             <div class="approval-meta">${meta} • ${dateTime}</div>
                             <div class="approval-desc">Reason: ${reason}</div>
                         </div>
                         <div class="approval-actions">
-                            <button class="btn btn-secondary" onclick="${rejectAction}">Reject</button>
-                            <button class="btn btn-primary" onclick="${approveAction}">Approve</button>
+                            <button class="btn btn-secondary" type="button" data-action="edit" onclick="(function(btn){ var row=btn.closest('.approval-item'); var span=row.querySelector('.approval-amount-text'); var input=row.querySelector('.approval-amount-input'); var id=row.getAttribute('data-id'); var editing=input.style.display!=='none'; if(editing){ var v=parseFloat(input.value); if(!isFinite(v)||v<=0){ if(window.showToast){ showToast('Invalid amount','Enter a positive number','error'); } else { alert('Enter a positive number'); } input.focus(); return; } span.textContent='$'+v.toFixed(2); span.style.display=''; input.style.display='none'; btn.textContent='Edit'; row.removeAttribute('data-editing'); row.setAttribute('data-edited','true'); window.__approvalEdits = window.__approvalEdits || {}; window.__approvalEdits[id] = Number(v.toFixed(2)); } else { var cur=(span.textContent||'').replace(/[^0-9.]/g,''); input.value=cur; span.style.display='none'; input.style.display=''; input.focus(); btn.textContent='Done'; row.setAttribute('data-editing','true'); row.removeAttribute('data-edited'); if(window.__approvalEdits){ delete window.__approvalEdits[id]; } } })(this)">Edit</button>
+                            <button class="btn btn-secondary" data-action="reject" onclick="${rejectAction}">Reject</button>
+                            <button class="btn btn-primary" data-action="approve" onclick="${approveAction}">Approve</button>
                         </div>
                     </div>
                 `;
@@ -1041,28 +1139,176 @@ window.approveWithdrawal = async function(id) {
     try {
         const ok = await openConfirm({ title: 'Approve Withdrawal', message: 'Approve this withdrawal request?', okText: 'Approve' });
         if (!ok) return;
-        const res = await API.approveWithdrawalRequest(id);
+
+        const approvalsListEl = document.getElementById('approvalsList');
+        const prevScroll = approvalsListEl ? approvalsListEl.scrollTop : 0;
+
+        const row = document.querySelector(`.approval-item[data-kind="withdrawal"][data-id="${id}"]`) || document.querySelector(`.approval-item [onclick="approveWithdrawal('${id}')"]`)?.closest('.approval-item');
+        let overrideAmount;
+        if (row) {
+            row.querySelectorAll('button').forEach(btn => btn.disabled = true);
+            const input = row.querySelector('.approval-amount-input');
+            if (input) {
+                const v = parseFloat(input.value);
+                if (!isFinite(v) || v <= 0) { showToast('Invalid amount', 'Enter a positive number', 'error'); row.querySelectorAll('button').forEach(btn => btn.disabled = false); return; }
+                overrideAmount = Number(v.toFixed(2));
+            }
+        }
+        if ((overrideAmount == null || !isFinite(overrideAmount) || overrideAmount <= 0) && window.__approvalEdits && window.__approvalEdits[id] != null) {
+            const m = Number(window.__approvalEdits[id]);
+            if (isFinite(m) && m > 0) overrideAmount = Number(m.toFixed(2));
+        }
+
+        const res = await API.approveWithdrawalRequest(id, overrideAmount);
         if (res.success) {
             showToast('Withdrawal approved', '', 'success');
-            await Promise.all([loadPendingApprovals(), loadChildrenList()]);
+
+            // Remove row
+            if (row && row.parentElement) row.parentElement.removeChild(row);
+
+            // Decrement pending counter
+            const pendingCount = document.getElementById('pendingRequests');
+            if (pendingCount) {
+                const n = parseInt(pendingCount.textContent || '0', 10);
+                if (!isNaN(n)) pendingCount.textContent = String(Math.max(0, n - 1));
+            }
+
+            // Update child balance in place if available
+            const childId = row?.getAttribute('data-child-id');
+            if (childId && typeof res.newBalance === 'number') {
+                const el = document.querySelector(`.child-card[data-child-id="${childId}"] .balance-amount`);
+                let oldBal = 0;
+                if (el) {
+                    oldBal = parseFloat((el.textContent || '').replace(/[^0-9.-]/g,'')) || 0;
+                    el.textContent = `$${Number(res.newBalance).toFixed(2)}`;
+                }
+                const totalBalanceElement = document.getElementById('totalBalance');
+                if (totalBalanceElement) {
+                    const tb = parseFloat(totalBalanceElement.textContent || '0') || 0;
+                    const delta = Number(res.newBalance) - oldBal;
+                    totalBalanceElement.textContent = (tb + delta).toFixed(2);
+                }
+            }
+
+            if (window.__approvalEdits) delete window.__approvalEdits[id];
+            if (approvalsListEl) approvalsListEl.scrollTop = prevScroll;
         } else {
-            showToast('Failed to approve', res.error || '', 'error');
+            // Friendlier, actionable error handling (keep row interactive, no page reload needed)
+            const apiMsg = (res && (res.error || res.message || '')) || '';
+            const insufficient = /insufficient|not enough|exceed|more than|over.*balance/i.test(apiMsg);
+            if (row) row.querySelectorAll('button').forEach(btn => btn.disabled = false);
+
+            if (insufficient) {
+                // Try to show current available balance for this child
+                let avail = null;
+                try {
+                    const fromChildId = row?.getAttribute('data-child-id');
+                    const ch = await Auth.getChildren();
+                    if (ch?.success && Array.isArray(ch.children)) {
+                        const child = ch.children.find(c => String(c.id) === String(fromChildId));
+                        if (child) avail = Number(child.savings) || 0;
+                    }
+                } catch (_) {}
+
+                const more = avail != null ? `Available: $${avail.toFixed(2)}.` : '';
+                showToast('Approval failed', `Not enough money. ${more} Adjust the amount and try again.`, 'error');
+
+                // Re-open inline editor so parent can correct amount immediately
+                try {
+                    const span = row.querySelector('.approval-amount-text');
+                    const input = row.querySelector('.approval-amount-input');
+                    const editBtn = row.querySelector('[data-action="edit"]');
+                    if (span && input && editBtn) {
+                        const cur = parseFloat((span.textContent || '').replace(/[^0-9.]/g, '')) || parseFloat(input.value) || 0;
+                        span.style.display = 'none';
+                        input.style.display = '';
+                        if (avail != null) {
+                            input.setAttribute('max', avail.toFixed(2));
+                            if (cur > avail) input.value = avail.toFixed(2);
+                        }
+                        editBtn.textContent = 'Done';
+                        row.setAttribute('data-editing', 'true');
+                        row.removeAttribute('data-edited');
+                        input.focus();
+                        if (input.select) input.select();
+                    }
+                } catch (_) {}
+            } else {
+                showToast('Failed to approve', apiMsg || 'Please try again', 'error');
+            }
         }
     } catch (e) {
         console.error('Approve withdrawal failed', e);
-        showToast('Failed to approve', '', 'error');
+        const row = document.querySelector(`.approval-item[data-kind="withdrawal"][data-id="${id}"]`) || document.querySelector(`.approval-item [onclick="approveWithdrawal('${id}')"]`)?.closest('.approval-item');
+        if (row) row.querySelectorAll('button').forEach(btn => btn.disabled = false);
+
+        const apiMsg = e && e.message ? String(e.message) : '';
+        const insufficient = /insufficient|not enough|exceed|more than|over.*balance/i.test(apiMsg);
+
+        if (insufficient && row) {
+            // Try to show current available balance for this child
+            let avail = null;
+            try {
+                const fromChildId = row?.getAttribute('data-child-id');
+                const ch = await Auth.getChildren();
+                if (ch?.success && Array.isArray(ch.children)) {
+                    const child = ch.children.find(c => String(c.id) === String(fromChildId));
+                    if (child) avail = Number(child.savings) || 0;
+                }
+            } catch (_) {}
+
+            const more = avail != null ? `Available: $${avail.toFixed(2)}.` : '';
+            showToast('Approval failed', `Not enough money. ${more} Adjust the amount and try again.`, 'error');
+
+            // Re-open inline editor so parent can correct amount immediately
+            try {
+                const span = row.querySelector('.approval-amount-text');
+                const input = row.querySelector('.approval-amount-input');
+                const editBtn = row.querySelector('[data-action="edit"]');
+                if (span && input && editBtn) {
+                    const cur = parseFloat((span.textContent || '').replace(/[^0-9.]/g, '')) || parseFloat(input.value) || 0;
+                    span.style.display = 'none';
+                    input.style.display = '';
+                    if (avail != null) {
+                        input.setAttribute('max', avail.toFixed(2));
+                        if (cur > avail) input.value = avail.toFixed(2);
+                    }
+                    editBtn.textContent = 'Done';
+                    row.setAttribute('data-editing', 'true');
+                    row.removeAttribute('data-edited');
+                    input.focus();
+                    if (input.select) input.select();
+                }
+            } catch (_) {}
+        } else {
+            showToast('Failed to approve', apiMsg || 'Please try again', 'error');
+        }
     }
 };
 window.rejectWithdrawalPrompt = async function(id) {
     try {
         const promptRes = await openTextPrompt({ title: 'Reject Withdrawal', message: 'Add a reason (optional):', placeholder: 'Reason (optional)', okText: 'Reject', cancelText: 'Cancel' });
         if (!promptRes || promptRes.cancelled) return;
+        const ok = await openConfirm({ title: 'Reject Withdrawal', message: 'Reject this withdrawal request?', okText: 'Reject' });
+        if (!ok) return;
+
+        const row = document.querySelector(`.approval-item[data-kind="withdrawal"][data-id="${id}"]`) || document.querySelector(`.approval-item [onclick="rejectWithdrawalPrompt('${id}')"]`)?.closest('.approval-item');
+        if (row) row.querySelectorAll('button').forEach(btn => btn.disabled = true);
+
         const res = await API.rejectWithdrawalRequest(id, promptRes.value || '');
         if (res.success) {
             showToast('Withdrawal rejected');
-            await loadPendingApprovals();
+            if (row && row.parentElement) row.parentElement.removeChild(row);
+
+            const pendingCount = document.getElementById('pendingRequests');
+            if (pendingCount) {
+                const n = parseInt(pendingCount.textContent || '0', 10);
+                if (!isNaN(n)) pendingCount.textContent = String(Math.max(0, n - 1));
+            }
+            if (window.__approvalEdits) delete window.__approvalEdits[id];
         } else {
             showToast('Failed to reject', res.error || '', 'error');
+            if (row) row.querySelectorAll('button').forEach(btn => btn.disabled = false);
         }
     } catch (e) {
         console.error('Reject withdrawal failed', e);
@@ -1073,16 +1319,142 @@ window.approveTransfer = async function(id) {
     try {
         const ok = await openConfirm({ title: 'Approve Transfer', message: 'Approve this transfer request?', okText: 'Approve' });
         if (!ok) return;
-        const res = await API.approveTransferRequest(id);
+
+        const approvalsListEl = document.getElementById('approvalsList');
+        const prevScroll = approvalsListEl ? approvalsListEl.scrollTop : 0;
+
+        const row = document.querySelector(`.approval-item[data-kind="transfer"][data-id="${id}"]`) || document.querySelector(`.approval-item [onclick="approveTransfer('${id}')"]`)?.closest('.approval-item');
+        let overrideAmount;
+        if (row) {
+            row.querySelectorAll('button').forEach(btn => btn.disabled = true);
+            const input = row.querySelector('.approval-amount-input');
+            if (input) {
+                const v = parseFloat(input.value);
+                if (!isFinite(v) || v <= 0) { showToast('Invalid amount', 'Enter a positive number', 'error'); row.querySelectorAll('button').forEach(btn => btn.disabled = false); return; }
+                overrideAmount = Number(v.toFixed(2));
+            }
+        }
+        if ((overrideAmount == null || !isFinite(overrideAmount) || overrideAmount <= 0) && window.__approvalEdits && window.__approvalEdits[id] != null) {
+            const m = Number(window.__approvalEdits[id]);
+            if (isFinite(m) && m > 0) overrideAmount = Number(m.toFixed(2));
+        }
+
+        const res = await API.approveTransferRequest(id, overrideAmount);
         if (res.success) {
             showToast('Transfer approved', '', 'success');
-            await Promise.all([loadPendingApprovals(), loadChildrenList()]);
+
+            if (row && row.parentElement) row.parentElement.removeChild(row);
+
+            const pendingCount = document.getElementById('pendingRequests');
+            if (pendingCount) {
+                const n = parseInt(pendingCount.textContent || '0', 10);
+                if (!isNaN(n)) pendingCount.textContent = String(Math.max(0, n - 1));
+            }
+
+            const fromChildId = row?.getAttribute('data-from-child-id');
+            const toChildId = row?.getAttribute('data-to-child-id');
+            if (fromChildId && typeof res.fromNewBalance === 'number') {
+                const el = document.querySelector(`.child-card[data-child-id="${fromChildId}"] .balance-amount`);
+                if (el) el.textContent = `$${Number(res.fromNewBalance).toFixed(2)}`;
+            }
+            if (toChildId && typeof res.toNewBalance === 'number') {
+                const el = document.querySelector(`.child-card[data-child-id="${toChildId}"] .balance-amount`);
+                if (el) el.textContent = `$${Number(res.toNewBalance).toFixed(2)}`;
+            }
+
+            if (window.__approvalEdits) delete window.__approvalEdits[id];
+            if (approvalsListEl) approvalsListEl.scrollTop = prevScroll;
         } else {
-            showToast('Failed to approve', res.error || '', 'error');
+            // Friendlier, actionable error handling (keep row interactive, no page reload needed)
+            const apiMsg = (res && (res.error || res.message || '')) || '';
+            const insufficient = /insufficient|not enough|exceed|more than|over.*balance/i.test(apiMsg);
+            if (row) row.querySelectorAll('button').forEach(btn => btn.disabled = false);
+
+            if (insufficient) {
+                // Try to show current available balance for the sender (transfer: from-child)
+                let avail = null;
+                try {
+                    const fromChildId = row?.getAttribute('data-from-child-id');
+                    const ch = await Auth.getChildren();
+                    if (ch?.success && Array.isArray(ch.children)) {
+                        const child = ch.children.find(c => String(c.id) === String(fromChildId));
+                        if (child) avail = Number(child.savings) || 0;
+                    }
+                } catch (_) {}
+
+                const more = avail != null ? `Available: $${avail.toFixed(2)}.` : '';
+                showToast('Approval failed', `Not enough money. ${more} Adjust the amount and try again.`, 'error');
+
+                // Re-open inline editor so parent can correct amount immediately
+                try {
+                    const span = row.querySelector('.approval-amount-text');
+                    const input = row.querySelector('.approval-amount-input');
+                    const editBtn = row.querySelector('[data-action="edit"]');
+                    if (span && input && editBtn) {
+                        const cur = parseFloat((span.textContent || '').replace(/[^0-9.]/g, '')) || parseFloat(input.value) || 0;
+                        span.style.display = 'none';
+                        input.style.display = '';
+                        if (avail != null) {
+                            input.setAttribute('max', avail.toFixed(2));
+                            if (cur > avail) input.value = avail.toFixed(2);
+                        }
+                        editBtn.textContent = 'Done';
+                        row.setAttribute('data-editing', 'true');
+                        row.removeAttribute('data-edited');
+                        input.focus();
+                        if (input.select) input.select();
+                    }
+                } catch (_) {}
+            } else {
+                showToast('Failed to approve', apiMsg || 'Please try again', 'error');
+            }
         }
     } catch (e) {
         console.error('Approve transfer failed', e);
-        showToast('Failed to approve', '', 'error');
+        const row = document.querySelector(`.approval-item[data-kind="transfer"][data-id="${id}"]`) || document.querySelector(`.approval-item [onclick="approveTransfer('${id}')"]`)?.closest('.approval-item');
+        if (row) row.querySelectorAll('button').forEach(btn => btn.disabled = false);
+
+        const apiMsg = e && e.message ? String(e.message) : '';
+        const insufficient = /insufficient|not enough|exceed|more than|over.*balance/i.test(apiMsg);
+
+        if (insufficient && row) {
+            // Try to show current available balance for the sender (transfer: from-child)
+            let avail = null;
+            try {
+                const fromChildId = row?.getAttribute('data-from-child-id');
+                const ch = await Auth.getChildren();
+                if (ch?.success && Array.isArray(ch.children)) {
+                    const child = ch.children.find(c => String(c.id) === String(fromChildId));
+                    if (child) avail = Number(child.savings) || 0;
+                }
+            } catch (_) {}
+
+            const more = avail != null ? `Available: $${avail.toFixed(2)}.` : '';
+            showToast('Approval failed', `Not enough money. ${more} Adjust the amount and try again.`, 'error');
+
+            // Re-open inline editor so parent can correct amount immediately
+            try {
+                const span = row.querySelector('.approval-amount-text');
+                const input = row.querySelector('.approval-amount-input');
+                const editBtn = row.querySelector('[data-action="edit"]');
+                if (span && input && editBtn) {
+                    const cur = parseFloat((span.textContent || '').replace(/[^0-9.]/g, '')) || parseFloat(input.value) || 0;
+                    span.style.display = 'none';
+                    input.style.display = '';
+                    if (avail != null) {
+                        input.setAttribute('max', avail.toFixed(2));
+                        if (cur > avail) input.value = avail.toFixed(2);
+                    }
+                    editBtn.textContent = 'Done';
+                    row.setAttribute('data-editing', 'true');
+                    row.removeAttribute('data-edited');
+                    input.focus();
+                    if (input.select) input.select();
+                }
+            } catch (_) {}
+        } else {
+            showToast('Failed to approve', apiMsg || 'Please try again', 'error');
+        }
     }
 };
 window.rejectTransferPrompt = async function(id) {
@@ -1090,12 +1462,24 @@ window.rejectTransferPrompt = async function(id) {
         const promptRes = await openTextPrompt({ title: 'Reject Transfer', message: 'Add an optional reason (or leave blank):', placeholder: 'Reason (optional)', okText: 'Continue', cancelText: 'Cancel' });
         const ok = await openConfirm({ title: 'Reject Transfer', message: 'Reject this transfer request?', okText: 'Reject' });
         if (!ok) return;
+
+        const row = document.querySelector(`.approval-item[data-kind="transfer"][data-id="${id}"]`) || document.querySelector(`.approval-item [onclick="rejectTransferPrompt('${id}')"]`)?.closest('.approval-item');
+        if (row) row.querySelectorAll('button').forEach(btn => btn.disabled = true);
+
         const res = await API.rejectTransferRequest(id, promptRes?.value || '');
         if (res.success) {
             showToast('Transfer rejected');
-            await loadPendingApprovals();
+
+            if (row && row.parentElement) row.parentElement.removeChild(row);
+            const pendingCount = document.getElementById('pendingRequests');
+            if (pendingCount) {
+                const n = parseInt(pendingCount.textContent || '0', 10);
+                if (!isNaN(n)) pendingCount.textContent = String(Math.max(0, n - 1));
+            }
+            if (window.__approvalEdits) delete window.__approvalEdits[id];
         } else {
             showToast('Failed to reject', res.error || '', 'error');
+            if (row) row.querySelectorAll('button').forEach(btn => btn.disabled = false);
         }
     } catch (e) {
         console.error('Reject transfer failed', e);
@@ -1108,16 +1492,66 @@ window.approveMoneyAddition = async function(id) {
     try {
         const ok = await openConfirm({ title: 'Approve Money Request', message: 'Approve this money addition request?', okText: 'Approve' });
         if (!ok) return;
-        const res = await API.approveMoneyAdditionRequest(id);
+
+        const approvalsListEl = document.getElementById('approvalsList');
+        const prevScroll = approvalsListEl ? approvalsListEl.scrollTop : 0;
+
+        const row = document.querySelector(`.approval-item[data-kind="money_addition"][data-id="${id}"]`) || document.querySelector(`.approval-item [onclick="approveMoneyAddition('${id}')"]`)?.closest('.approval-item');
+        let overrideAmount;
+        if (row) {
+            row.querySelectorAll('button').forEach(btn => btn.disabled = true);
+            const input = row.querySelector('.approval-amount-input');
+            if (input) {
+                const v = parseFloat(input.value);
+                if (!isFinite(v) || v <= 0) { showToast('Invalid amount', 'Enter a positive number', 'error'); row.querySelectorAll('button').forEach(btn => btn.disabled = false); return; }
+                overrideAmount = Number(v.toFixed(2));
+            }
+        }
+        if ((overrideAmount == null || !isFinite(overrideAmount) || overrideAmount <= 0) && window.__approvalEdits && window.__approvalEdits[id] != null) {
+            const m = Number(window.__approvalEdits[id]);
+            if (isFinite(m) && m > 0) overrideAmount = Number(m.toFixed(2));
+        }
+
+        const res = await API.approveMoneyAdditionRequest(id, overrideAmount);
         if (res.success) {
             showToast('Money request approved', '', 'success');
-            await Promise.all([loadPendingApprovals(), loadChildrenList()]);
+
+            if (row && row.parentElement) row.parentElement.removeChild(row);
+
+            const pendingCount = document.getElementById('pendingRequests');
+            if (pendingCount) {
+                const n = parseInt(pendingCount.textContent || '0', 10);
+                if (!isNaN(n)) pendingCount.textContent = String(Math.max(0, n - 1));
+            }
+
+            // Update the child's displayed balance if available from server response
+            const childId = row?.getAttribute('data-child-id');
+            if (childId && typeof res.newBalance === 'number') {
+                const el = document.querySelector(`.child-card[data-child-id="${childId}"] .balance-amount`);
+                let oldBal = 0;
+                if (el) {
+                    oldBal = parseFloat((el.textContent || '').replace(/[^0-9.-]/g,'')) || 0;
+                    el.textContent = `$${Number(res.newBalance).toFixed(2)}`;
+                }
+                const totalBalanceElement = document.getElementById('totalBalance');
+                if (totalBalanceElement) {
+                    const tb = parseFloat(totalBalanceElement.textContent || '0') || 0;
+                    const delta = Number(res.newBalance) - oldBal;
+                    totalBalanceElement.textContent = (tb + delta).toFixed(2);
+                }
+            }
+
+            if (window.__approvalEdits) delete window.__approvalEdits[id];
+            if (approvalsListEl) approvalsListEl.scrollTop = prevScroll;
         } else {
-            showToast('Failed to approve', res.error || '', 'error');
+            showToast('Failed to approve', res.error || 'Please try again', 'error');
+            if (row) row.querySelectorAll('button').forEach(btn => btn.disabled = false);
         }
     } catch (e) {
         console.error('Approve money addition failed', e);
-        showToast('Failed to approve', '', 'error');
+        const row = document.querySelector(`.approval-item[data-kind="money_addition"][data-id="${id}"]`) || document.querySelector(`.approval-item [onclick="approveMoneyAddition('${id}')"]`)?.closest('.approval-item');
+        if (row) row.querySelectorAll('button').forEach(btn => btn.disabled = false);
+        showToast('Failed to approve', e?.message || 'Please try again', 'error');
     }
 };
 window.rejectMoneyAdditionPrompt = async function(id) {
@@ -1125,12 +1559,24 @@ window.rejectMoneyAdditionPrompt = async function(id) {
         const promptRes = await openTextPrompt({ title: 'Reject Money Request', message: 'Add an optional reason (or leave blank):', placeholder: 'Reason (optional)', okText: 'Continue', cancelText: 'Cancel' });
         const ok = await openConfirm({ title: 'Reject Money Request', message: 'Reject this money addition request?', okText: 'Reject' });
         if (!ok) return;
+
+        const row = document.querySelector(`.approval-item[data-kind="money_addition"][data-id="${id}"]`) || document.querySelector(`.approval-item [onclick="rejectMoneyAdditionPrompt('${id}')"]`)?.closest('.approval-item');
+        if (row) row.querySelectorAll('button').forEach(btn => btn.disabled = true);
+
         const res = await API.rejectMoneyAdditionRequest(id, promptRes?.value || '');
         if (res.success) {
             showToast('Money request rejected');
-            await loadPendingApprovals();
+
+            if (row && row.parentElement) row.parentElement.removeChild(row);
+            const pendingCount = document.getElementById('pendingRequests');
+            if (pendingCount) {
+                const n = parseInt(pendingCount.textContent || '0', 10);
+                if (!isNaN(n)) pendingCount.textContent = String(Math.max(0, n - 1));
+            }
+            if (window.__approvalEdits) delete window.__approvalEdits[id];
         } else {
             showToast('Failed to reject', res.error || '', 'error');
+            if (row) row.querySelectorAll('button').forEach(btn => btn.disabled = false);
         }
     } catch (e) {
         console.error('Reject money addition failed', e);
@@ -1171,7 +1617,7 @@ async function loadChildrenList() {
                 childrenList.innerHTML = '<p class="no-data children-empty">No children yet — click the + button on the right to add your first child.</p>';
             } else {
                 childrenList.innerHTML = result.children.map(child => `
-                    <div class="child-card sleek vertical">
+                    <div class="child-card sleek vertical" data-child-id="${child.id}">
                         <div class="card-header">
                             <button class="settings-btn" onclick="openChildSettings('${child.id}','${child.name}','${child.username}')">⚙️</button>
                         </div>
@@ -1215,12 +1661,17 @@ function setupParentModals() {
         });
     });
 
-    // Click outside modal to close
-    window.addEventListener('click', (e) => {
-        if (e.target.classList.contains('modal')) {
-            e.target.style.display = 'none';
-        }
-    });
+    // Backdrop close helper: only close when the press started on the backdrop
+    const bindBackdropClose = (modalEl) => {
+        if (!modalEl) return;
+        let down = false;
+        const onDown = (e) => { down = (e.target === modalEl); };
+        const onClick = (e) => { if (e.target === modalEl && down) modalEl.style.display = 'none'; down = false; };
+        modalEl.addEventListener('mousedown', onDown);
+        modalEl.addEventListener('touchstart', onDown, { passive: true });
+        modalEl.addEventListener('click', onClick);
+    };
+    bindBackdropClose(addMoneyModal);
 
     // Add money form submission
     if (addMoneyForm) {
@@ -1262,8 +1713,21 @@ function setupParentModals() {
                     addMoneyModal.style.display = 'none';
                     addMoneyForm.reset();
 
-                    // Refresh children list to show updated balance
-                    await loadChildrenList();
+                    const card = document.querySelector(`.child-card[data-child-id="${childId}"]`);
+                    let oldBal = 0;
+                    if (card) {
+                        const balEl = card.querySelector('.balance-amount');
+                        if (balEl) {
+                            oldBal = parseFloat((balEl.textContent || '').replace(/[^0-9.-]/g,'')) || 0;
+                            balEl.textContent = `$${Number(result.newBalance).toFixed(2)}`;
+                        }
+                    }
+                    const totalBalanceElement = document.getElementById('totalBalance');
+                    if (totalBalanceElement) {
+                        const tb = parseFloat(totalBalanceElement.textContent || '0') || 0;
+                        const delta = Number(result.newBalance) - oldBal;
+                        totalBalanceElement.textContent = (tb + delta).toFixed(2);
+                    }
                 } else {
                     showToast('Failed to add money', result.error || 'Unknown error', 'error');
                 }
@@ -1279,6 +1743,7 @@ function setupParentModals() {
     // Remove money modal handling
     const removeMoneyModal = document.getElementById('removeMoneyModal');
     const removeMoneyForm = document.getElementById('removeMoneyForm');
+    bindBackdropClose(removeMoneyModal);
 
     if (removeMoneyForm) {
         removeMoneyForm.addEventListener('submit', async (e) => {
@@ -1317,7 +1782,22 @@ function setupParentModals() {
                     showToast('Money removed', `New balance: $${result.newBalance.toFixed(2)}`, 'success');
                     removeMoneyModal.style.display = 'none';
                     removeMoneyForm.reset();
-                    await loadChildrenList();
+
+                    const card = document.querySelector(`.child-card[data-child-id="${childId}"]`);
+                    let oldBal = 0;
+                    if (card) {
+                        const balEl = card.querySelector('.balance-amount');
+                        if (balEl) {
+                            oldBal = parseFloat((balEl.textContent || '').replace(/[^0-9.-]/g,'')) || 0;
+                            balEl.textContent = `$${Number(result.newBalance).toFixed(2)}`;
+                        }
+                    }
+                    const totalBalanceElement = document.getElementById('totalBalance');
+                    if (totalBalanceElement) {
+                        const tb = parseFloat(totalBalanceElement.textContent || '0') || 0;
+                        const delta = Number(result.newBalance) - oldBal;
+                        totalBalanceElement.textContent = (tb + delta).toFixed(2);
+                    }
                 } else {
                     showToast('Failed to remove money', result.error || 'Unknown error', 'error');
                 }
@@ -1349,12 +1829,8 @@ function setupParentModals() {
             addChildModal.style.display = 'none';
         });
 
-        // Close modal when clicking outside (already handled above, but being explicit)
-        addChildModal.addEventListener('click', (e) => {
-            if (e.target === addChildModal) {
-                addChildModal.style.display = 'none';
-            }
-        });
+        // Close modal when clicking outside (only if press started on backdrop)
+        bindBackdropClose(addChildModal);
     }
 
     // Setup Transaction History Modal
@@ -1367,12 +1843,8 @@ function setupParentModals() {
             transactionHistoryModal.style.display = 'none';
         });
 
-        // Close modal when clicking outside
-        transactionHistoryModal.addEventListener('click', (e) => {
-            if (e.target === transactionHistoryModal) {
-                transactionHistoryModal.style.display = 'none';
-            }
-        });
+        // Close modal when clicking outside (only if press started on backdrop)
+        bindBackdropClose(transactionHistoryModal);
     }
 }
 
@@ -1389,6 +1861,20 @@ function setupChildActions() {
     const withdrawalForm = document.getElementById('withdrawalForm');
     const addMoneyRequestForm = document.getElementById('addMoneyRequestForm');
     const transferForm = document.getElementById('transferForm');
+
+    // Backdrop close helper for child modals
+    const bindBackdropClose = (modalEl) => {
+        if (!modalEl) return;
+        let down = false;
+        const onDown = (e) => { down = (e.target === modalEl); };
+        const onClick = (e) => { if (e.target === modalEl && down) modalEl.style.display = 'none'; down = false; };
+        modalEl.addEventListener('mousedown', onDown);
+        modalEl.addEventListener('touchstart', onDown, { passive: true });
+        modalEl.addEventListener('click', onClick);
+    };
+    bindBackdropClose(withdrawalModal);
+    bindBackdropClose(addMoneyRequestModal);
+    bindBackdropClose(transferModal);
 
     // Setup modal close buttons
     const closeButtons = document.querySelectorAll('.modal .close');
@@ -1414,27 +1900,43 @@ function setupChildActions() {
 
     // Transfer money button
     if (transferBtn && transferModal) {
-        transferBtn.addEventListener('click', async () => {
-            // Populate siblings before showing modal
-            try {
-                const select = document.getElementById('siblingSelect');
-                if (select) {
-                    select.innerHTML = '<option value="">Select a sibling</option>';
-                    const res = await API.request('/siblings');
-                    if (res.success && Array.isArray(res.siblings)) {
-                        res.siblings.forEach(sib => {
-                            const opt = document.createElement('option');
-                            opt.value = sib.id;
-                            opt.textContent = `${sib.name}`;
-                            select.appendChild(opt);
-                        });
+        if (!transferBtn.dataset.bound) {
+            transferBtn.dataset.bound = 'true';
+            transferBtn.addEventListener('click', async () => {
+                try {
+                    // Stamp to ignore stale responses from rapid multiple clicks
+                    transferBtn.__siblingsReqSeq = (transferBtn.__siblingsReqSeq || 0) + 1;
+                    const seq = transferBtn.__siblingsReqSeq;
+
+                    const select = document.getElementById('siblingSelect');
+                    if (select) {
+                        // Reset options each time
+                        select.innerHTML = '<option value="">Select a sibling</option>';
+                        const res = await API.request('/siblings');
+
+                        // Ignore if a newer click started a newer request
+                        if (seq !== transferBtn.__siblingsReqSeq) return;
+
+                        if (res.success && Array.isArray(res.siblings)) {
+                            // Deduplicate siblings by id just in case
+                            const seen = new Set();
+                            res.siblings.forEach(sib => {
+                                const idStr = String(sib.id);
+                                if (seen.has(idStr)) return;
+                                seen.add(idStr);
+                                const opt = document.createElement('option');
+                                opt.value = idStr;
+                                opt.textContent = `${sib.name}`;
+                                select.appendChild(opt);
+                            });
+                        }
                     }
+                } catch (err) {
+                    console.error('Failed to load siblings', err);
                 }
-            } catch (err) {
-                console.error('Failed to load siblings', err);
-            }
-            transferModal.style.display = 'flex';
-        });
+                transferModal.style.display = 'flex';
+            });
+        }
     }
 
     // Withdrawal form submission
@@ -1649,7 +2151,31 @@ window.confirmDeleteChild = async function(childId, name) {
         showToast('Child account deleted', '', 'success');
         const modal = document.getElementById('childSettingsModal');
         if (modal) modal.style.display = 'none';
-        await loadChildrenList();
+
+        // Remove card in place and update totals
+        const card = document.querySelector(`.child-card[data-child-id="${childId}"]`);
+        let bal = 0;
+        if (card) {
+            const balEl = card.querySelector('.balance-amount');
+            if (balEl) bal = parseFloat((balEl.textContent || '').replace(/[^0-9.-]/g,'')) || 0;
+            card.parentElement?.removeChild(card);
+        }
+
+        const totalChildrenElement = document.getElementById('totalChildren');
+        if (totalChildrenElement) {
+            const n = parseInt(totalChildrenElement.textContent || '0', 10) || 0;
+            totalChildrenElement.textContent = String(Math.max(0, n - 1));
+        }
+        const totalBalanceElement = document.getElementById('totalBalance');
+        if (totalBalanceElement) {
+            const tb = parseFloat(totalBalanceElement.textContent || '0') || 0;
+            totalBalanceElement.textContent = Math.max(0, tb - bal).toFixed(2);
+        }
+
+        const list = document.getElementById('childrenList');
+        if (list && !list.querySelector('.child-card')) {
+            list.innerHTML = '<p class="no-data children-empty">No children yet — click the + button on the right to add your first child.</p>';
+        }
     } catch (e) {
         showToast('Failed to delete child', e.message || '', 'error');
     }
@@ -1764,12 +2290,12 @@ function setupResetPinValidation() {
 /**
  * Load pending requests (withdrawals and transfers) for child dashboard
  */
-async function loadChildPendingRequests() {
+async function loadChildPendingRequests(options = {}) {
     const container = document.getElementById('childPendingList');
     if (!container) return;
 
     // Show loading state
-    container.innerHTML = '<div class="loading-placeholder">Loading pending requests...</div>';
+    if (!options.soft) { container.innerHTML = '<div class="loading-placeholder">Loading pending requests...</div>'; }
 
     try {
         const [withdrawals, transfers, moneyAdditions] = await Promise.all([
@@ -1908,13 +2434,13 @@ function replaceUsernamesWithNames(desc, usernameToName) {
 /**
  * Load transaction history for child dashboard
  */
-async function loadChildTransactionHistory() {
+async function loadChildTransactionHistory(options = {}) {
 
     const transactionList = document.getElementById('childTransactionList');
     if (!transactionList) return;
 
     // Show loading state
-    transactionList.innerHTML = '<div class="loading-placeholder">Loading transaction history...</div>';
+    if (!options.soft) { transactionList.innerHTML = '<div class="loading-placeholder">Loading transaction history...</div>'; }
 
     try {
         const user = Auth.getUser();
@@ -2111,7 +2637,10 @@ window.openChildSettings = function(childId, name, username) {
     if (!modal) return;
     const closeBtn = document.getElementById('childSettingsClose');
     closeBtn?.addEventListener('click', ()=> modal.style.display='none');
-    window.addEventListener('click', (e)=>{ if (e.target === modal) modal.style.display='none'; });
+    let downOnBackdrop = false;
+    modal.addEventListener('mousedown', (e) => { downOnBackdrop = (e.target === modal); });
+    modal.addEventListener('touchstart', (e) => { downOnBackdrop = (e.target === modal); }, { passive: true });
+    modal.addEventListener('click', (e) => { if (e.target === modal && downOnBackdrop) modal.style.display='none'; downOnBackdrop = false; });
 
     // Reset PIN form with double confirm
     const resetForm = document.getElementById('resetPinForm');
@@ -2164,7 +2693,29 @@ window.openChildSettings = function(childId, name, username) {
             await API.deleteChild(childId);
             showToast('Child deleted', '', 'success');
             modal.style.display = 'none';
-            await loadChildrenList();
+
+            // Remove card and update totals in place
+            const card = document.querySelector(`.child-card[data-child-id="${childId}"]`);
+            let bal = 0;
+            if (card) {
+                const balEl = card.querySelector('.balance-amount');
+                if (balEl) bal = parseFloat((balEl.textContent || '').replace(/[^0-9.-]/g,'')) || 0;
+                card.parentElement?.removeChild(card);
+            }
+            const totalChildrenElement = document.getElementById('totalChildren');
+            if (totalChildrenElement) {
+                const n = parseInt(totalChildrenElement.textContent || '0', 10) || 0;
+                totalChildrenElement.textContent = String(Math.max(0, n - 1));
+            }
+            const totalBalanceElement = document.getElementById('totalBalance');
+            if (totalBalanceElement) {
+                const tb = parseFloat(totalBalanceElement.textContent || '0') || 0;
+                totalBalanceElement.textContent = Math.max(0, tb - bal).toFixed(2);
+            }
+            const list = document.getElementById('childrenList');
+            if (list && !list.querySelector('.child-card')) {
+                list.innerHTML = '<p class="no-data children-empty">No children yet — click the + button on the right to add your first child.</p>';
+            }
         } catch (err) {
             showToast('Failed to delete child', err.message || '', 'error');
         }
@@ -2436,13 +2987,12 @@ function setupParentSettings() {
         });
     }
 
-    // Click outside modal to close
+    // Click outside modal to close (only if press started on backdrop)
     if (settingsModal) {
-        settingsModal.addEventListener('click', (e) => {
-            if (e.target === settingsModal) {
-                settingsModal.style.display = 'none';
-            }
-        });
+        let downOnBackdrop = false;
+        settingsModal.addEventListener('mousedown', (e) => { downOnBackdrop = (e.target === settingsModal); });
+        settingsModal.addEventListener('touchstart', (e) => { downOnBackdrop = (e.target === settingsModal); }, { passive: true });
+        settingsModal.addEventListener('click', (e) => { if (e.target === settingsModal && downOnBackdrop) settingsModal.style.display = 'none'; downOnBackdrop = false; });
     }
 
     // Setup section toggles
@@ -2834,4 +3384,195 @@ function setSettingsLoading(formType, loading) {
 
         submitButton.textContent = loading ? loadingText[formType] : originalText[formType];
     }
+}
+
+// Realtime updates for Child dashboard: balance, pending requests, and transaction history
+function startChildRealtimeUpdates() {
+    try {
+        const me = Auth.getUser();
+        if (!me || me.role !== 'child') return;
+
+        // Avoid multiple initializations
+        if (window.__childRealtime && window.__childRealtime.active) return;
+
+        window.__childRealtime = {
+            active: true,
+            inflight: false,
+            timer: null,
+            visibleMs: 5000,   // poll every 5s when tab is visible
+            hiddenMs: 15000    // poll every 15s when tab is hidden
+        };
+
+        const schedule = () => {
+            if (!window.__childRealtime || !window.__childRealtime.active) return;
+            if (window.__childRealtime.timer) clearTimeout(window.__childRealtime.timer);
+            const delay = document.visibilityState === 'visible'
+                ? window.__childRealtime.visibleMs
+                : window.__childRealtime.hiddenMs;
+
+            window.__childRealtime.timer = setTimeout(async () => {
+                await tick();
+                schedule();
+            }, delay);
+        };
+
+        const tick = async () => {
+            if (!window.__childRealtime || !window.__childRealtime.active) return;
+            if (window.__childRealtime.inflight) return; // skip overlapping ticks
+            window.__childRealtime.inflight = true;
+
+            try {
+                // 1) Refresh minimal user state (balance, etc.) via /verify
+                //    This keeps Auth.getUser() in sync and updates the header balance.
+                try {
+                    const verifyRes = await Auth.request('/verify');
+                    if (verifyRes && verifyRes.success && verifyRes.user) {
+                        // Update local cached user
+                        localStorage.setItem(CONFIG.USER_KEY, JSON.stringify(verifyRes.user));
+
+                        // Update balance display if present
+                        const balEl = document.getElementById('childBalance');
+                        if (balEl) {
+                            const newBal = Number(verifyRes.user.savings || 0);
+                            const currentText = balEl.textContent || '';
+                            const current = parseFloat(currentText.replace(/[^0-9.-]/g, '')) || 0;
+                            if (Math.abs(newBal - current) > 0.0001) {
+                                balEl.textContent = newBal.toFixed(2);
+                            }
+                        }
+                    }
+                } catch (e) {
+                    // If auth expired, stop polling quietly
+                    if (String(e && e.message || '').toLowerCase().includes('unauthorized') ||
+                        String(e && e.message || '').includes('401')) {
+                        stopChildRealtimeUpdates();
+                        return;
+                    }
+                }
+
+                // 2) Soft refresh pending requests section (no loaders to prevent flicker)
+                try {
+                    await loadChildPendingRequests({ soft: true });
+                } catch (_) {}
+
+                // 3) Soft refresh transaction history (no loaders)
+                try {
+                    await loadChildTransactionHistory({ soft: true });
+                } catch (_) {}
+
+            } finally {
+                if (window.__childRealtime) window.__childRealtime.inflight = false;
+            }
+        };
+
+        // Re-schedule on tab visibility changes to switch polling cadence
+        document.addEventListener('visibilitychange', () => {
+            if (!window.__childRealtime || !window.__childRealtime.active) return;
+            if (window.__childRealtime.timer) clearTimeout(window.__childRealtime.timer);
+            schedule();
+        });
+
+        // Initial immediate refresh, then schedule subsequent polls
+        (async () => {
+            await (async () => {
+                try {
+                    const verifyRes = await Auth.request('/verify');
+                    if (verifyRes && verifyRes.success && verifyRes.user) {
+                        localStorage.setItem(CONFIG.USER_KEY, JSON.stringify(verifyRes.user));
+                        const balEl = document.getElementById('childBalance');
+                        if (balEl) {
+                            const newBal = Number(verifyRes.user.savings || 0);
+                            balEl.textContent = newBal.toFixed(2);
+                        }
+                    }
+                } catch (_) {}
+                try { await loadChildPendingRequests({ soft: true }); } catch (_) {}
+                try { await loadChildTransactionHistory({ soft: true }); } catch (_) {}
+            })();
+            schedule();
+        })();
+    } catch (e) {
+        // On any unexpected error, disable realtime to avoid tight loops
+        stopChildRealtimeUpdates();
+        console.warn('[Dashboard] Realtime updates initialization failed:', e && e.message);
+    }
+}
+
+function stopChildRealtimeUpdates() {
+    if (!window.__childRealtime) return;
+    window.__childRealtime.active = false;
+    if (window.__childRealtime.timer) {
+        clearTimeout(window.__childRealtime.timer);
+        window.__childRealtime.timer = null;
+    }
+}
+
+// Realtime updates for Parent dashboard: pending approvals auto-refresh without reload
+function startParentRealtimeUpdates() {
+    try {
+        const me = Auth.getUser();
+        if (!me || me.role !== 'parent') return;
+
+        // Avoid multiple initializations
+        if (window.__parentRealtime && window.__parentRealtime.active) return;
+
+        window.__parentRealtime = {
+            active: true,
+            inflight: false,
+            timer: null,
+            visibleMs: 5000,   // poll every 5s when tab is visible
+            hiddenMs: 15000    // poll every 15s when tab is hidden
+        };
+
+        const schedule = () => {
+            if (!window.__parentRealtime || !window.__parentRealtime.active) return;
+            if (window.__parentRealtime.timer) clearTimeout(window.__parentRealtime.timer);
+            const delay = document.visibilityState === 'visible'
+                ? window.__parentRealtime.visibleMs
+                : window.__parentRealtime.hiddenMs;
+
+            window.__parentRealtime.timer = setTimeout(async () => {
+                await tick();
+                schedule();
+            }, delay);
+        };
+
+        const tick = async () => {
+            if (!window.__parentRealtime || !window.__parentRealtime.active) return;
+            if (window.__parentRealtime.inflight) return; // skip overlapping ticks
+            window.__parentRealtime.inflight = true;
+
+            try {
+                // Soft refresh approvals so new child requests appear automatically
+                try { await loadPendingApprovals({ soft: true }); } catch (_) {}
+            } finally {
+                if (window.__parentRealtime) window.__parentRealtime.inflight = false;
+            }
+        };
+
+        document.addEventListener('visibilitychange', () => {
+            if (!window.__parentRealtime || !window.__parentRealtime.active) return;
+            if (window.__parentRealtime.timer) clearTimeout(window.__parentRealtime.timer);
+            schedule();
+        });
+
+        // Initial immediate refresh, then schedule subsequent polls
+        (async () => {
+            try { await loadPendingApprovals({ soft: true }); } catch (_) {}
+            schedule();
+        })();
+    } catch (e) {
+        stopParentRealtimeUpdates();
+        console.warn('[Dashboard] Parent realtime updates initialization failed:', e && e.message);
+    }
+}
+
+function stopParentRealtimeUpdates() {
+    if (!window.__parentRealtime) return;
+    window.__parentRealtime.active = false;
+    if (window.__parentRealtime.timer) {
+        clearTimeout(window.__parentRealtime.timer);
+        window.__parentRealtime.timer = null;
+    }
+
 }

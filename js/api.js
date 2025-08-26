@@ -33,8 +33,9 @@ const API = (function() {
             return request('/withdrawal-requests');
         },
 
-        async approveWithdrawalRequest(requestId) {
-            return request(`/withdrawal-requests/${requestId}/approve`, 'POST');
+        async approveWithdrawalRequest(requestId, amount) {
+            const body = (amount !== undefined && amount !== null) ? { amount } : undefined;
+            return request(`/withdrawal-requests/${requestId}/approve`, 'POST', body);
         },
 
         async rejectWithdrawalRequest(requestId, reason) {
@@ -54,8 +55,9 @@ const API = (function() {
             return request('/transfers');
         },
 
-        async approveTransferRequest(requestId) {
-            return request(`/transfers/${requestId}/approve`, 'POST');
+        async approveTransferRequest(requestId, amount) {
+            const body = (amount !== undefined && amount !== null) ? { amount } : undefined;
+            return request(`/transfers/${requestId}/approve`, 'POST', body);
         },
 
         async rejectTransferRequest(requestId, reason) {
@@ -74,8 +76,9 @@ const API = (function() {
             return request('/money-addition-requests');
         },
 
-        async approveMoneyAdditionRequest(requestId) {
-            return request(`/money-addition-requests/${requestId}/approve`, 'POST');
+        async approveMoneyAdditionRequest(requestId, amount) {
+            const body = (amount !== undefined && amount !== null) ? { amount } : undefined;
+            return request(`/money-addition-requests/${requestId}/approve`, 'POST', body);
         },
 
         async rejectMoneyAdditionRequest(requestId, reason) {

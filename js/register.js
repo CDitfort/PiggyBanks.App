@@ -55,12 +55,64 @@ document.addEventListener('DOMContentLoaded', () => {
             const result = await Auth.register(name, email, password, securityQuestion, securityAnswer);
             
             if (result.success) {
-                showSuccess('Account created successfully! Redirecting to dashboard...');
-                
-                // Redirect to dashboard after 2 seconds
-                setTimeout(() => {
+                // Show one-time recovery code modal (only shown now)
+                try {
+                    const modal = document.getElementById('recoveryCodeModal');
+                    const codeBox = document.getElementById('recoveryCodeValue');
+                    const btnCopy = document.getElementById('copyRecoveryCode');
+                    const btnAck = document.getElementById('ackRecoveryCode');
+                    const copySuccess = document.getElementById('recoveryCopySuccess');
+
+                    // Advise user clearly that this code is shown only once
+                    showSuccess('Account created! Your one-time recovery code is shown below. Save it now — you will never see it again.');
+
+                    if (modal && codeBox && btnCopy && btnAck) {
+                        const recoveryCode = (result.recoveryCode || '').toString();
+                        codeBox.textContent = recoveryCode;
+                        if (copySuccess) { copySuccess.textContent = ''; copySuccess.style.display = 'none'; }
+
+                        // Open modal
+                        modal.style.display = 'flex';
+
+                        // Wire copy button once
+                        if (!btnCopy.dataset.bound) {
+                            btnCopy.dataset.bound = 'true';
+                            btnCopy.addEventListener('click', async () => {
+                                try {
+                                    await navigator.clipboard.writeText(codeBox.textContent || '');
+                                    if (copySuccess) {
+                                        copySuccess.textContent = 'Recovery code copied. Keep it somewhere safe.';
+                                        copySuccess.style.display = 'block';
+                                    }
+                                } catch (e) {
+                                    if (copySuccess) {
+                                        copySuccess.textContent = 'Copy failed. Please select and copy the code manually.';
+                                        copySuccess.style.display = 'block';
+                                    }
+                                }
+                            });
+                        }
+
+                        // Wire acknowledgement button once
+                        if (!btnAck.dataset.bound) {
+                            btnAck.dataset.bound = 'true';
+                            btnAck.addEventListener('click', () => {
+                                // Hide modal and continue to dashboard
+                                modal.style.display = 'none';
+                                // Clear code text from DOM to avoid lingering
+                                codeBox.textContent = '';
+                                // Proceed to dashboard
+                                window.location.href = CONFIG.ROUTES.DASHBOARD;
+                            });
+                        }
+                    } else {
+                        // Fallback: if modal is missing, just redirect (should not happen)
+                        window.location.href = CONFIG.ROUTES.DASHBOARD;
+                    }
+                } catch (e) {
+                    // As a safety net, redirect if modal display failed
                     window.location.href = CONFIG.ROUTES.DASHBOARD;
-                }, 2000);
+                }
             } else {
                 showError(result.error || 'Registration failed. Please try again.');
                 setFormLoading(false);

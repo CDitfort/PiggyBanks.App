@@ -6,6 +6,66 @@ const Auth = (function() {
     const pendingRequests = new Map();
     const requestIdHeader = 'X-Request-ID';
     
+    // reCAPTCHA v3 helpers
+    const recaptchaState = {
+        loading: null
+    };
+    
+    function getRecaptchaSiteKey() {
+        try {
+            return (CONFIG && CONFIG.RECAPTCHA_SITE_KEY) ? String(CONFIG.RECAPTCHA_SITE_KEY).trim() : '';
+        } catch (e) {
+            return '';
+        }
+    }
+    
+    function ensureRecaptchaScriptLoaded() {
+        const siteKey = getRecaptchaSiteKey();
+        if (!siteKey) return null; // reCAPTCHA not configured
+        if (recaptchaState.loading) return recaptchaState.loading;
+        
+        recaptchaState.loading = new Promise((resolve) => {
+            if (window.grecaptcha && typeof window.grecaptcha.ready === 'function') {
+                return resolve();
+            }
+            const existing = document.querySelector('script[data-recaptcha-loaded]');
+            if (existing) {
+                existing.addEventListener('load', () => resolve());
+                existing.addEventListener('error', () => resolve()); // resolve to allow graceful fallback
+                return;
+            }
+            const s = document.createElement('script');
+            s.src = `https://www.google.com/recaptcha/api.js?render=${encodeURIComponent(siteKey)}`;
+            s.async = true;
+            s.defer = true;
+            s.setAttribute('data-recaptcha-loaded', 'true');
+            s.onload = () => resolve();
+            s.onerror = () => resolve(); // graceful fallback
+            document.head.appendChild(s);
+        });
+        return recaptchaState.loading;
+    }
+    
+    async function getRecaptchaToken(action) {
+        try {
+            const siteKey = getRecaptchaSiteKey();
+            if (!siteKey) return null;
+            await ensureRecaptchaScriptLoaded();
+            if (!window.grecaptcha || typeof window.grecaptcha.execute !== 'function') {
+                return null;
+            }
+            return await new Promise((resolve) => {
+                window.grecaptcha.ready(() => {
+                    window.grecaptcha.execute(siteKey, { action })
+                        .then(token => resolve(token))
+                        .catch(() => resolve(null));
+                });
+            });
+        } catch (e) {
+            return null;
+        }
+    }
+    
     // Private methods
     
     /**
@@ -213,17 +273,19 @@ const Auth = (function() {
          */
         async register(name, email, password, securityQuestion, securityAnswer) {
             try {
+                const recaptchaToken = await getRecaptchaToken('register');
                 const result = await makeAuthRequest('/register', 'POST', {
                     name,
                     email,
                     password,
                     securityQuestion,
-                    securityAnswer
+                    securityAnswer,
+                    recaptchaToken
                 });
                 
                 if (result.success) {
                     storeAuthData(result.token, result.user);
-                    return { success: true, message: result.message };
+                    return { success: true, message: result.message, recoveryCode: result.recoveryCode };
                 }
                 
                 return { success: false, error: result.error };
@@ -238,10 +300,12 @@ const Auth = (function() {
         async loginParent(email, password) {
             try {
                 console.log('[Auth] Parent login attempt for:', email);
+                const recaptchaToken = await getRecaptchaToken('login_parent');
                 const result = await makeAuthRequest('/login', 'POST', {
                     email,
                     password,
-                    role: 'parent'
+                    role: 'parent',
+                    recaptchaToken
                 });
                 
                 if (result.success) {
@@ -263,10 +327,12 @@ const Auth = (function() {
         async loginChild(username, pin) {
             try {
                 console.log('[Auth] Child login attempt for:', username);
+                const recaptchaToken = await getRecaptchaToken('login_child');
                 const result = await makeAuthRequest('/login', 'POST', {
                     username,
                     pin,
-                    role: 'child'
+                    role: 'child',
+                    recaptchaToken
                 });
                 
                 if (result.success) {

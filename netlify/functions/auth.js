@@ -13,7 +13,7 @@ const innerApp = createApp({ mongoUri: MONGODB_URI, jwtSecret: JWT_SECRET });
 // Mount inner app at that base path so routes resolve correctly under Netlify.
 // Also parse JSON at the outer level to ensure body is available to inner routes.
 const outerApp = express();
-outerApp.use(express.json());
+// Let the inner app handle JSON/urlencoded parsing to avoid double-parsing under serverless
 outerApp.use('/.netlify/functions/auth', innerApp);
 
 module.exports.handler = serverless(outerApp);

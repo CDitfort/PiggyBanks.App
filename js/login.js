@@ -432,6 +432,11 @@ document.addEventListener('DOMContentLoaded', () => {
   const securityQuestionForm = document.getElementById('securityQuestionForm');
   const cancelEmailVerification = document.getElementById('cancelEmailVerification');
   const backToEmailStep = document.getElementById('backToEmailStep');
+  // Recovery-code step elements
+  const useRecoveryCodeLink = document.getElementById('useRecoveryCodeLink');
+  const recoveryCodeStep = document.getElementById('recoveryCodeStep');
+  const recoveryCodeForm = document.getElementById('recoveryCodeForm');
+  const backToSecurityStep = document.getElementById('backToSecurityStep');
 
   // Open forgot password modal
   if (forgotPasswordLink && forgotPasswordModal) {
@@ -461,12 +466,16 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   }
 
-  // Click outside modal to close
+  // Click outside modal to close (only if the press started on the backdrop)
   if (forgotPasswordModal) {
+    let downOnBackdrop = false;
+    forgotPasswordModal.addEventListener('mousedown', (e) => { downOnBackdrop = (e.target === forgotPasswordModal); });
+    forgotPasswordModal.addEventListener('touchstart', (e) => { downOnBackdrop = (e.target === forgotPasswordModal); }, { passive: true });
     forgotPasswordModal.addEventListener('click', (e) => {
-      if (e.target === forgotPasswordModal) {
+      if (e.target === forgotPasswordModal && downOnBackdrop) {
         forgotPasswordModal.style.display = 'none';
       }
+      downOnBackdrop = false;
     });
   }
 
@@ -475,6 +484,29 @@ document.addEventListener('DOMContentLoaded', () => {
     backToEmailStep.addEventListener('click', () => {
       emailVerificationStep.style.display = 'block';
       securityQuestionStep.style.display = 'none';
+      clearForgotPasswordMessages();
+    });
+  }
+
+  // Switch to Recovery Code step
+  if (useRecoveryCodeLink) {
+    useRecoveryCodeLink.addEventListener('click', (e) => {
+      e.preventDefault();
+      // Move from security question to recovery code step
+      if (securityQuestionStep) securityQuestionStep.style.display = 'none';
+      if (recoveryCodeStep) recoveryCodeStep.style.display = 'block';
+      const emailVal = document.getElementById('verifiedEmail')?.value || '';
+      const emailForCodeField = document.getElementById('verifiedEmailForCode');
+      if (emailForCodeField) emailForCodeField.value = emailVal;
+      clearForgotPasswordMessages();
+    });
+  }
+
+  // Back to Security Question step
+  if (backToSecurityStep) {
+    backToSecurityStep.addEventListener('click', () => {
+      if (recoveryCodeStep) recoveryCodeStep.style.display = 'none';
+      if (securityQuestionStep) securityQuestionStep.style.display = 'block';
       clearForgotPasswordMessages();
     });
   }
@@ -508,6 +540,8 @@ document.addEventListener('DOMContentLoaded', () => {
           // Move to security question step
           document.getElementById('displaySecurityQuestion').textContent = result.securityQuestion;
           document.getElementById('verifiedEmail').value = email;
+          const emailForCodeField = document.getElementById('verifiedEmailForCode');
+          if (emailForCodeField) emailForCodeField.value = email;
           emailVerificationStep.style.display = 'none';
           securityQuestionStep.style.display = 'block';
           clearForgotPasswordMessages();
@@ -653,6 +687,79 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   }
 
-  console.log('[Login] Event handlers attached successfully');
+ // Recovery Code form handler
+ if (recoveryCodeForm) {
+   recoveryCodeForm.addEventListener('submit', async (e) => {
+     e.preventDefault();
+
+     const formData = new FormData(recoveryCodeForm);
+     const email = (formData.get('verifiedEmailForCode') || '').toString().trim().toLowerCase();
+     const recoveryCode = (formData.get('recoveryCodeInput') || '').toString().trim();
+     const newPassword = (formData.get('newPasswordCodeInput') || '').toString();
+     const confirmPassword = (formData.get('confirmNewPasswordCodeInput') || '').toString();
+
+     if (!email) { showRecoveryCodeError('Email is missing. Please go back and verify your email again.'); return; }
+     if (!recoveryCode) { showRecoveryCodeError('Recovery code is required'); return; }
+     if (!newPassword) { showRecoveryCodeError('New password is required'); return; }
+     if (newPassword.length < 6) { showRecoveryCodeError('Password must be at least 6 characters long'); return; }
+     if (newPassword !== confirmPassword) { showRecoveryCodeError('Passwords do not match'); return; }
+
+     try {
+       setRecoveryCodeLoading(true);
+       const response = await fetch(`${CONFIG.API_BASE_URL}/forgot-password/reset-with-code`, {
+         method: 'POST',
+         headers: { 'Content-Type': 'application/json' },
+         body: JSON.stringify({ email, recoveryCode, newPassword })
+       });
+
+       const result = await response.json();
+       if (result.success) {
+         showPasswordResetSuccessCode('Password reset successfully! You can now login with your new password.');
+         setTimeout(() => {
+           forgotPasswordModal.style.display = 'none';
+           const emailInput = document.getElementById('parentEmail');
+           if (emailInput) {
+             emailInput.value = email;
+             emailInput.focus();
+           }
+         }, 3000);
+       } else {
+         showRecoveryCodeError(result.error || 'Failed to reset password');
+       }
+     } catch (error) {
+       console.error('Password reset with code error:', error);
+       showRecoveryCodeError('An unexpected error occurred. Please try again.');
+     } finally {
+       setRecoveryCodeLoading(false);
+     }
+   });
+ }
+
+ // Helpers for Recovery Code step
+ function showRecoveryCodeError(message) {
+   const errorElement = document.getElementById('recoveryCodeError');
+   if (errorElement) {
+     errorElement.textContent = message;
+     errorElement.style.display = 'block';
+   }
+ }
+
+ function showPasswordResetSuccessCode(message) {
+   const successElement = document.getElementById('passwordResetSuccessCode');
+   if (successElement) {
+     successElement.textContent = message;
+     successElement.style.display = 'block';
+   }
+ }
+
+ function setRecoveryCodeLoading(loading) {
+   const submitButton = recoveryCodeForm?.querySelector('button[type="submit"]');
+   if (submitButton) {
+     submitButton.disabled = loading;
+     submitButton.textContent = loading ? 'Resetting...' : 'Reset Password';
+   }
+ }
+
+ console.log('[Login] Event handlers attached successfully');
 });
 

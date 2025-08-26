@@ -5,6 +5,8 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Login - Piggybanks.app</title>
     <link rel="stylesheet" href="css/styles.css">
+    <!-- Google reCAPTCHA v3: set your site key here or via window.PIGGYBANKS_RECAPTCHA_SITE_KEY before js/config.js -->
+    <meta name="recaptcha-site-key" content="">
 </head>
 <body>
     <header>
@@ -143,6 +145,35 @@
                         <div class="success-message" id="passwordResetSuccess"></div>
                         <div class="modal-actions">
                             <button type="button" class="btn btn-secondary" id="backToEmailStep">Back</button>
+                            <button type="submit" class="btn btn-primary">Reset Password</button>
+                        </div>
+                    </form>
+                    <p style="margin-top: 8px; font-size: 0.9rem;">
+                        Or <a href="#" id="useRecoveryCodeLink">use your recovery code</a> instead.
+                    </p>
+                </div>
+
+                <!-- Step 3: Recovery Code -->
+                <div id="recoveryCodeStep" style="display: none;">
+                    <p>Reset your password using your one-time recovery code:</p>
+                    <form id="recoveryCodeForm">
+                        <input type="hidden" id="verifiedEmailForCode" name="verifiedEmailForCode">
+                        <div class="form-group">
+                            <label for="recoveryCodeInput">Recovery Code</label>
+                            <input type="text" id="recoveryCodeInput" name="recoveryCodeInput" required placeholder="XXXX-XXXX-XXXX-XXXX-XXXX">
+                        </div>
+                        <div class="form-group">
+                            <label for="newPasswordCodeInput">New Password</label>
+                            <input type="password" id="newPasswordCodeInput" name="newPasswordCodeInput" required placeholder="Enter new password (min 6 characters)">
+                        </div>
+                        <div class="form-group">
+                            <label for="confirmNewPasswordCodeInput">Confirm New Password</label>
+                            <input type="password" id="confirmNewPasswordCodeInput" name="confirmNewPasswordCodeInput" required placeholder="Confirm new password">
+                        </div>
+                        <div class="error-message" id="recoveryCodeError"></div>
+                        <div class="success-message" id="passwordResetSuccessCode"></div>
+                        <div class="modal-actions">
+                            <button type="button" class="btn btn-secondary" id="backToSecurityStep">Back</button>
                             <button type="submit" class="btn btn-primary">Reset Password</button>
                         </div>
                     </form>

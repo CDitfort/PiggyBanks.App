@@ -67,6 +67,10 @@ async function connect(mongoUri) {
       if (!hasUserIndex({ username: 1 }, true)) {
         await createIndexSafe(users, { username: 1 }, { name: 'idx_users_username_unique', unique: true, sparse: true });
       }
+      // Ensure unique recovery code hash index (sparse so users without a code are ignored)
+      if (!hasUserIndex({ recoveryCodeHash: 1 }, true)) {
+        await createIndexSafe(users, { recoveryCodeHash: 1 }, { name: 'idx_users_recovery_code_hash_unique', unique: true, sparse: true });
+      }
 
       // Other collections: only create if a matching key doesn't already exist
       if (!(await hasIndex(blacklistedTokens, { token: 1 }))) {

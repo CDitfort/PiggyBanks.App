@@ -5,6 +5,8 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Register - Piggybanks.app</title>
     <link rel="stylesheet" href="css/styles.css">
+    <!-- Google reCAPTCHA v3: set your site key here or via window.PIGGYBANKS_RECAPTCHA_SITE_KEY before js/config.js -->
+    <meta name="recaptcha-site-key" content="">
 </head>
 <body>
     <header>
@@ -81,6 +83,20 @@
                     <p>Already have an account? <a href="login.html">Login here</a></p>
                 </div>
             </div>
+        <!-- Recovery Code Modal (shown once after registration) -->
+        <div id="recoveryCodeModal" class="modal" style="display: none;">
+            <div class="modal-content">
+                <h3>Save your recovery code</h3>
+                <p>This code is shown only once. Write it down or take a photo now; you will never see this code again.</p>
+                <div id="recoveryCodeValue" class="recovery-code-box" style="font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', 'Courier New', monospace; letter-spacing: 0.15em; font-size: 1.1rem; padding: 12px 16px; background: #0f172a; color: #e2e8f0; border-radius: 8px; text-align: center; margin: 10px 0;"></div>
+                <div class="modal-actions" style="display:flex; gap:8px; justify-content:flex-end; margin-top:12px;">
+                    <button type="button" class="btn btn-secondary" id="copyRecoveryCode">Copy Code</button>
+                    <button type="button" class="btn btn-primary" id="ackRecoveryCode">I have saved it</button>
+                </div>
+                <div class="success-message" id="recoveryCopySuccess" style="display:none; margin-top:8px;"></div>
+            </div>
+        </div>
+
         </main>
 
         <footer>
