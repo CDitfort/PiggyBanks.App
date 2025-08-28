@@ -1,5 +1,7 @@
 document.addEventListener('DOMContentLoaded', () => {
   console.log('[Login] Page initialized');
+  // Ensure reCAPTCHA v3 badge loads promptly on this page
+  try { Auth.preloadRecaptcha('login_page'); } catch (e) {}
 
   // Request state tracking to prevent duplicate submissions
   let parentLoginInProgress = false;

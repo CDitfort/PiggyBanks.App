@@ -1407,7 +1407,16 @@ img[src^="chrome-extension://ohcpnigalekghcmgcdcenkpelffpdolg/"] {
     .hero-buttons {
         justify-content: center;
         flex-direction: column;
-        align-items: center;
+        align-items: stretch; /* make children fill the line */
+        width: 100%;          /* ensure container spans full content width */
+    }
+    .hero-buttons .btn {
+        display: flex;        /* block-level flex so width takes effect */
+        width: 100%;
+        max-width: 100%;      /* no cap on small screens */
+        min-height: 48px;     /* larger tap target */
+        font-size: var(--text-base);
+        border-radius: var(--radius-xl);
     }
 
     .features {
@@ -1459,6 +1468,17 @@ img[src^="chrome-extension://ohcpnigalekghcmgcdcenkpelffpdolg/"] {
         left: auto;
         top: auto;
     }
+
+    /* CTA: full-width for mobile (<=768px) */
+    .cta .btn,
+    .cta .btn-large {
+        display: flex;
+        width: 100%;
+        max-width: 100%;
+        min-height: 52px;
+        font-size: var(--text-lg);
+        border-radius: var(--radius-xl);
+    }
 }
 
 @media (max-width: 480px) {
@@ -1505,8 +1525,30 @@ img[src^="chrome-extension://ohcpnigalekghcmgcdcenkpelffpdolg/"] {
     }
 
     .btn-large {
-        padding: var(--space-3) var(--space-6);
-        font-size: var(--text-sm);
+        padding: var(--space-4) var(--space-8);
+        font-size: var(--text-base);
+        min-height: 48px;
+    }
+
+    /* CTA: full-width button on very small phones */
+    .cta .btn,
+    .cta .btn-large {
+        display: block;
+        width: 100%;
+        max-width: 100%;
+        min-height: 52px;           /* ~52px tap target */
+        font-size: var(--text-lg);  /* larger label */
+        border-radius: var(--radius-xl);
+    }
+
+    /* Hero CTA specific sizing for small phones */
+    .hero-buttons .btn-large {
+        min-height: 52px;          /* 48–52px as requested */
+        font-size: var(--text-lg); /* larger label */
+        width: 100%;
+        max-width: 100%;
+        display: flex;
+        border-radius: var(--radius-xl);
     }
 
     /* Dashboard header for very small screens */
@@ -2024,6 +2066,7 @@ footer {
     background: var(--primary-600);
     color: white;
     border-color: var(--primary-600);
+}
 
 /* Input confirm modal input padding */
 .input-confirm {
@@ -2340,4 +2383,156 @@ footer {
     box-sizing: border-box;
 }
 
+/* Ensure Google reCAPTCHA v3 badge is visible and above UI elements.
+   Do not hide or obscure this badge to comply with Google terms. */
+.grecaptcha-badge {
+  position: fixed !important;
+  bottom: 12px !important;
+  right: 12px !important;
+  visibility: visible !important;
+  opacity: 1 !important;
+  display: block !important;
+  pointer-events: auto !important;
+  z-index: 2147483647 !important;
+}
+.grecaptcha-badge iframe {
+  pointer-events: auto !important;
+}
+/* Focused Registration Form Enhancements */
+.focused-form {
+  margin: 0 auto;
+  padding: 0;
+}
+
+.focused-form .form-group {
+  max-width: 520px;
+  margin: 0 auto var(--space-6);
+}
+
+@media (max-width: 640px) {
+  .focused-form .form-group {
+    max-width: 100%;
+  }
+}
+
+.focused-form .form-group label {
+  font-size: var(--text-base);
+  color: var(--neutral-800);
+}
+
+.focused-form .form-group input,
+.focused-form .form-group select,
+.focused-form .form-group textarea {
+  width: 100%;
+  padding: var(--space-5) var(--space-6);
+  font-size: var(--text-lg);
+  min-height: 54px;
+  border-radius: var(--radius-xl);
+}
+
+.focused-form .form-group input::placeholder {
+  font-size: var(--text-base);
+}
+
+.focused-form .btn-large {
+  padding: var(--space-5) var(--space-10);
+  font-size: var(--text-lg);
+  min-height: 54px;
+  border-radius: var(--radius-xl);
+}
+
+.focused-form .form-navigation {
+  justify-content: center;
+  gap: var(--space-4);
+  margin-top: var(--space-6) !important;
+}
+
+.step-indicator {
+  text-align: center;
+  color: var(--neutral-600);
+  font-size: var(--text-sm);
+  margin-top: var(--space-2);
+}
+
+/* Micro-interactions for steps (non-blocking if display toggles) */
+.focused-form .form-step {
+  will-change: opacity, transform;
+  transition: opacity var(--transition-fast), transform var(--transition-fast);
+}
+/* Registration UX Tweaks: better space usage and invalid field highlight */
+.register-card {
+  max-width: 480px; /* match login form width */
+  padding: var(--space-12); /* match .auth-card default padding */
+}
+@media (min-width: 1024px) {
+  .register-card { max-width: 480px; } /* keep width consistent on large screens */
+}
+@media (max-width: 480px) {
+  .register-card { padding: var(--space-6); } /* match .auth-card small-screen padding */
+}
+
+/* Widen input column to better use available space on larger screens */
+.focused-form .form-group {
+  max-width: 600px;
+}
+
+/* Larger nav spacing and clearer step indicator */
+.focused-form .form-navigation {
+  gap: var(--space-5);
+  margin-top: var(--space-8) !important;
+}
+.step-indicator {
+  font-size: var(--text-base);
+  color: var(--neutral-700);
+}
+
+/* Invalid field highlight + subtle shake to draw attention */
+@keyframes pbx-shake-x {
+  0%,100% { transform: translateX(0); }
+  20% { transform: translateX(-6px); }
+  40% { transform: translateX(6px); }
+  60% { transform: translateX(-4px); }
+  80% { transform: translateX(4px); }
+}
+.form-group.input-error {
+  animation: pbx-shake-x 220ms ease-in-out;
+}
+.form-group.input-error input,
+.form-group.input-error select,
+.form-group.input-error textarea,
+input[aria-invalid="true"],
+select[aria-invalid="true"],
+textarea[aria-invalid="true"] {
+  border-color: var(--error-600) !important;
+  background: var(--error-50) !important;
+  box-shadow: 0 0 0 3px rgba(220, 38, 38, 0.12) !important;
+}
+/* Registration spacing fixes per feedback */
+.focused-form .form-group {
+  margin: 0 auto var(--space-6); /* match login: no extra top gap */
+}
+.focused-form .form-group label {
+  margin-top: 0;  /* match login spacing */
+}
+.focused-form .step-indicator {
+  margin-top: var(--space-4) !important; /* more space between buttons and counter */
+}
+/* Registration header-to-form spacing: match login */
+.register-card h2 { margin-bottom: var(--space-1); }
+.register-card .auth-subtitle { margin-bottom: var(--space-4); }
+/* Ensure no extra top margin above the first field */
+.focused-form .form-group:first-of-type { margin-top: 0 !important; }
+/* Registration compact header spacing overrides to match login */
+.register-card h2 { margin-top: 0 !important; margin-bottom: var(--space-1) !important; }
+.register-card .auth-subtitle { margin-top: 0 !important; margin-bottom: var(--space-2) !important; }
+/* Ensure first field starts immediately under subtitle */
+.register-card .focused-form .form-group:first-of-type { margin-top: 0 !important; }
+/* Registration page: reduce top gap under header to match login */
+.auth-container.register-page {
+  min-height: auto;            /* disable vertical centering that added extra gap */
+  align-items: flex-start;      /* start at top instead of centered */
+  padding-top: var(--space-6);  /* visually matches login spacing under header */
+}
+@media (max-width: 768px) {
+  .auth-container.register-page { padding-top: var(--space-4); }
 }

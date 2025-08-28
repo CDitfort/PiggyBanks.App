@@ -5,6 +5,10 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Piggybanks.app - Children's Chore Money Tracker</title>
     <link rel="stylesheet" href="css/styles.css">
+    <link rel="manifest" href="manifest.webmanifest">
+    <meta name="theme-color" content="#0ea5e9">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 </head>
 <body>
     <header>
@@ -16,6 +20,7 @@
                     </a>
                 </div>
                 <nav>
+                    <button type="button" class="btn btn-secondary" data-install-app data-install-desktop-only title="Install App" aria-label="Install App">Install App</button>
                     <a href="login.html" class="btn btn-secondary">Login</a>
                     <a href="register.html" class="btn btn-primary">Sign Up</a>
                 </nav>
@@ -109,5 +114,6 @@
             <p>&copy; 2024 Piggybanks.app. All rights reserved.</p>
         </footer>
     </div>
+    <script src="js/pwa.js"></script>
 </body>
 </html>

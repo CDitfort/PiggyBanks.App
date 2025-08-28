@@ -6,6 +6,10 @@
     <title>Dashboard - Piggybanks.app</title>
     <link rel="stylesheet" href="css/styles.css">
     <link rel="stylesheet" href="css/additions.css">
+    <link rel="manifest" href="manifest.webmanifest">
+    <meta name="theme-color" content="#0ea5e9">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 
 </head>
 <body>
@@ -16,6 +20,7 @@
             </div>
             <div id="userName" class="welcome"></div>
             <div class="header-actions">
+                <button type="button" class="btn btn-secondary" data-install-app title="Install App" aria-label="Install App" style="display:none;">Install App</button>
                 <button id="parentSettingsBtn" class="btn btn-icon settings-btn" title="Account Settings" style="display: none;">⚙️</button>
                 <button id="logoutBtn" class="btn btn-secondary logout-btn">Logout</button>
             </div>
@@ -533,6 +538,7 @@
         </footer>
     </div>
 
+    <script src="js/pwa.js"></script>
     <script src="js/config.js"></script>
     <script src="js/auth.js"></script>
     <script src="js/api.js"></script>

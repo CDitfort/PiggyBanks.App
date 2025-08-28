@@ -23,25 +23,39 @@ const Auth = (function() {
         const siteKey = getRecaptchaSiteKey();
         if (!siteKey) return null; // reCAPTCHA not configured
         if (recaptchaState.loading) return recaptchaState.loading;
-        
+
         recaptchaState.loading = new Promise((resolve) => {
-            if (window.grecaptcha && typeof window.grecaptcha.ready === 'function') {
+            // If grecaptcha is already available (standard or enterprise), resolve
+            if (
+                window.grecaptcha &&
+                (
+                    typeof window.grecaptcha.ready === 'function' ||
+                    (window.grecaptcha.enterprise && typeof window.grecaptcha.enterprise.ready === 'function')
+                )
+            ) {
                 return resolve();
             }
-            const existing = document.querySelector('script[data-recaptcha-loaded]');
-            if (existing) {
-                existing.addEventListener('load', () => resolve());
-                existing.addEventListener('error', () => resolve()); // resolve to allow graceful fallback
-                return;
-            }
-            const s = document.createElement('script');
-            s.src = `https://www.google.com/recaptcha/api.js?render=${encodeURIComponent(siteKey)}`;
-            s.async = true;
-            s.defer = true;
-            s.setAttribute('data-recaptcha-loaded', 'true');
-            s.onload = () => resolve();
-            s.onerror = () => resolve(); // graceful fallback
-            document.head.appendChild(s);
+
+            const loadScript = (src, onDone) => {
+                const tag = document.createElement('script');
+                tag.src = src;
+                tag.async = true;
+                tag.defer = true;
+                tag.setAttribute('data-recaptcha-loaded', 'true');
+                tag.onload = onDone;
+                tag.onerror = onDone; // resolve even on error to avoid blocking UX
+                document.head.appendChild(tag);
+            };
+
+            // Try standard v3 first, then Enterprise fallback if needed
+            loadScript(`https://www.google.com/recaptcha/api.js?render=${encodeURIComponent(siteKey)}`, () => {
+                const rc = window.grecaptcha && (window.grecaptcha.enterprise || window.grecaptcha);
+                if (rc && typeof rc.ready === 'function') {
+                    return resolve();
+                }
+                // Fallback to Enterprise script
+                loadScript(`https://www.google.com/recaptcha/enterprise.js?render=${encodeURIComponent(siteKey)}`, () => resolve());
+            });
         });
         return recaptchaState.loading;
     }
@@ -51,18 +65,40 @@ const Auth = (function() {
             const siteKey = getRecaptchaSiteKey();
             if (!siteKey) return null;
             await ensureRecaptchaScriptLoaded();
-            if (!window.grecaptcha || typeof window.grecaptcha.execute !== 'function') {
+            const rc = window.grecaptcha && (window.grecaptcha.enterprise || window.grecaptcha);
+            if (!rc || typeof rc.execute !== 'function' || typeof rc.ready !== 'function') {
                 return null;
             }
             return await new Promise((resolve) => {
-                window.grecaptcha.ready(() => {
-                    window.grecaptcha.execute(siteKey, { action })
+                rc.ready(() => {
+                    rc.execute(siteKey, { action })
                         .then(token => resolve(token))
                         .catch(() => resolve(null));
                 });
             });
         } catch (e) {
             return null;
+        }
+    }
+
+    // Preload reCAPTCHA and show the v3 badge on page load
+    async function preloadRecaptcha(action = 'pageview') {
+        try {
+            const siteKey = getRecaptchaSiteKey();
+            if (!siteKey) return false;
+            await ensureRecaptchaScriptLoaded();
+            const rc = window.grecaptcha && (window.grecaptcha.enterprise || window.grecaptcha);
+            if (rc && typeof rc.ready === 'function') {
+                // Execute once so the v3 badge appears immediately
+                rc.ready(() => {
+                    try {
+                        rc.execute(siteKey, { action }).catch(() => {});
+                    } catch (_) {}
+                });
+            }
+            return true;
+        } catch (_) {
+            return false;
         }
     }
     
@@ -412,6 +448,9 @@ const Auth = (function() {
         redirectIfAuthenticated,
         requireAuth,
         clearAuthData,
+
+        // Recaptcha initializer for showing the v3 badge on page load
+        preloadRecaptcha,
         
         // Expose request method for use by other modules
         request: makeAuthRequest

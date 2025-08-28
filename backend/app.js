@@ -241,7 +241,128 @@ function createApp({ mongoUri, jwtSecret }) {
     res.json({ status: 'healthy', timestamp: new Date().toISOString() });
   });
 
-  // Registration (parent)
+// Email verification via Reoon (public, no auth)
+app.get('/email-verifier', async (req, res) => {
+  try {
+    const email = String((req.query && req.query.email) || '').trim().toLowerCase();
+    if (!email || !/.+@.+\..+/.test(email)) {
+      return res.status(400).json({ error: 'Valid email is required' });
+    }
+
+    const apiKey = process.env.REOON_EMAIL_VERIFIER_KEY || process.env.REOON_API_KEY || '';
+    const timeoutMs = Number(process.env.REOON_EMAIL_VERIFIER_TIMEOUT_MS || 20000);
+
+    if (!apiKey) {
+      // Not configured: treat as unknown (acceptable per requirement), but signal disabled
+      return res.json({
+        success: true,
+        status: 'unknown',
+        treated: 'accept',
+        disabled: true,
+        reason: 'not_configured'
+      });
+    }
+
+    const started = Date.now();
+    const url = `https://emailverifier.reoon.com/api/v1/verify?email=${encodeURIComponent(email)}&key=${encodeURIComponent(apiKey)}&mode=power&ts=${Date.now()}`;
+
+    async function callOnce(ms) {
+      const t0 = Date.now();
+      const controller = new AbortController();
+      const timer = setTimeout(() => controller.abort(), ms);
+      try {
+        const resp = await fetch(url, {
+          signal: controller.signal,
+          headers: {
+            'Accept': 'application/json',
+            'Cache-Control': 'no-cache'
+          }
+        });
+        const text = await resp.text();
+        let parsed;
+        let parseError = false;
+        try {
+          parsed = text ? JSON.parse(text) : {};
+        } catch (e) {
+          parseError = true;
+          parsed = { parseError: true, raw: text };
+        }
+        const elapsed = Date.now() - t0;
+        return { ok: resp.ok, parsed, statusCode: resp.status, text, elapsed_ms: elapsed, parseError };
+      } catch (err) {
+        return { ok: false, error: (err && err.message) || String(err), elapsed_ms: Date.now() - t0 };
+      } finally {
+        clearTimeout(timer);
+      }
+    }
+
+    const timeouts = [
+      timeoutMs,
+      Math.max(timeoutMs, 30000),
+      Math.max(Math.floor(timeoutMs * 1.5), 45000)
+    ];
+
+    const attempts_detail = [];
+    let r = null;
+    let parsed = {};
+    let statusRaw = 'unknown';
+
+    for (let i = 0; i < timeouts.length; i++) {
+      r = await callOnce(timeouts[i]);
+      parsed = r.parsed || {};
+      statusRaw = parsed && parsed.status ? String(parsed.status).toLowerCase() : 'unknown';
+      attempts_detail.push({
+        attempt: i + 1,
+        status: statusRaw,
+        ok: !!r.ok,
+        statusCode: r.statusCode || 0,
+        error: r.error,
+        elapsed_ms: r.elapsed_ms
+      });
+      if (r.ok && statusRaw !== 'unknown') break;
+      if (i < timeouts.length - 1) {
+        const delay = 1500 * (i + 1);
+        await new Promise(resDelay => setTimeout(resDelay, delay));
+      }
+    }
+
+    const attempts = attempts_detail.length;
+
+    const treated =
+      (statusRaw === 'safe' || statusRaw === 'unknown') ? 'accept' :
+      (statusRaw === 'inbox_full') ? 'inbox_full' :
+      'reject';
+
+    return res.json({
+      success: true,
+      email: parsed.email || email,
+      status: statusRaw,
+      treated,
+      overall_score: parsed.overall_score,
+      is_valid_syntax: parsed.is_valid_syntax,
+      is_disposable: parsed.is_disposable,
+      is_role_account: parsed.is_role_account,
+      can_connect_smtp: parsed.can_connect_smtp,
+      has_inbox_full: parsed.has_inbox_full,
+      is_catch_all: parsed.is_catch_all,
+      is_deliverable: parsed.is_deliverable,
+      is_disabled: parsed.is_disabled,
+      is_spamtrap: parsed.is_spamtrap,
+      is_free_email: parsed.is_free_email,
+      mx_accepts_mail: parsed.mx_accepts_mail,
+      mx_records: parsed.mx_records,
+      verification_mode: parsed.verification_mode || 'power',
+      attempts,
+      attempts_detail,
+      elapsed_ms: Date.now() - started
+    });
+  } catch (error) {
+    console.error('Email verification endpoint error:', error);
+    return res.status(500).json({ error: 'Verification failed' });
+  }
+});
+ 
+// Registration (parent)
   app.post('/register', async (req, res) => {
     try {
       const { recaptchaToken } = req.body || {};
