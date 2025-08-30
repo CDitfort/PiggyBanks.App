@@ -1,8 +1,11 @@
+/* Google Fonts Import - MUST be at top of stylesheet */
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap');
+
 /* Modern Design System Reset */
 * {
-    margin: 0;
-    padding: 0;
-    box-sizing: border-box;
+     margin: 0;
+     padding: 0;
+     box-sizing: border-box;
 }
 
 :root {
@@ -94,8 +97,6 @@
     --transition-normal: 300ms cubic-bezier(0.4, 0, 0.2, 1);
     --transition-slow: 500ms cubic-bezier(0.4, 0, 0.2, 1);
 }
-
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap');
 
 body {
     font-family: var(--font-family-sans);
@@ -682,6 +683,13 @@ header nav .btn-secondary:hover {
     display: grid;
     grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
     gap: var(--space-4);
+}
+
+/* Mobile: stack stats cards vertically on screens below 640px */
+@media (max-width: 640px) {
+    .stats-grid {
+        grid-template-columns: 1fr;
+    }
 }
 
 .stat-card {
@@ -1586,6 +1594,61 @@ img[src^="chrome-extension://ohcpnigalekghcmgcdcenkpelffpdolg/"] {
         left: auto;
         top: auto;
         white-space: normal;
+    }
+}
+
+/* Narrow mobile screens (below 375px) - fix overflow issues */
+@media (max-width: 375px) {
+    .container {
+        padding: 0 var(--space-2);
+    }
+
+    header {
+        padding: var(--space-2) 0;
+    }
+
+    .header-card {
+        padding: var(--space-1) var(--space-3);
+        gap: var(--space-3);
+        border-radius: var(--radius-lg); /* Reduce rounded corners for tighter space */
+    }
+
+    header .logo a {
+        gap: var(--space-1);
+    }
+
+    header .logo h1 {
+        font-size: var(--text-sm);
+    }
+
+    header nav {
+        gap: var(--space-1);
+        flex-wrap: wrap;
+        justify-content: center;
+        flex: 1;
+    }
+
+    header nav .btn {
+        padding: var(--space-1) var(--space-2);
+        font-size: var(--text-xs);
+        min-width: 45px;
+        max-width: calc(50% - var(--space-2));
+        flex: 1 1 auto;
+        word-wrap: break-word;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+    }
+
+    /* Adjust container margin for very narrow screens */
+    .auth-container {
+        padding: var(--space-4) 0;
+    }
+
+    /* Ensure auth cards fit narrow screens */
+    .auth-card {
+        padding: var(--space-4);
+        margin: var(--space-1);
     }
 }
 

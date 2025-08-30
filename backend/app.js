@@ -408,6 +408,8 @@ app.get('/email-verifier', async (req, res) => {
         lastLogin: null,
         children: []
       };
+      // Set username to email for parents to match child usernames and avoid null in index
+      user.username = user.email;
       const result = await users.insertOne(user);
       const token = generateToken({ ...user, _id: result.insertedId });
 

@@ -35,9 +35,8 @@ const CONFIG = {
 
 // Expose globally and log for debugging
 window.CONFIG = CONFIG;
-console.log('[Config] API_BASE_URL:', CONFIG.API_BASE_URL);
 if (CONFIG.RECAPTCHA_SITE_KEY) {
-    console.log('[Config] reCAPTCHA site key is configured');
+    // reCAPTCHA site key configured
 } else {
     console.warn('[Config] reCAPTCHA site key is NOT configured');
 }

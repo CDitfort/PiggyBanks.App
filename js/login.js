@@ -1,5 +1,5 @@
 document.addEventListener('DOMContentLoaded', () => {
-  console.log('[Login] Page initialized');
+// Page initialization started
   // Ensure reCAPTCHA v3 badge loads promptly on this page
   try { Auth.preloadRecaptcha('login_page'); } catch (e) {}
 
@@ -231,7 +231,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
       // Check if a login is already in progress
       if (parentLoginInProgress) {
-        console.log('[Login] Parent login already in progress, ignoring duplicate submission');
+        // Parent login already in progress, ignoring duplicate submission
         return;
       }
 
@@ -253,7 +253,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
       // Set login in progress flag
       parentLoginInProgress = true;
-      console.log('[Login] Starting parent login for:', email);
+      // Starting parent login for email
 
       // Disable form during submission
       setParentFormLoading(true);
@@ -265,11 +265,11 @@ document.addEventListener('DOMContentLoaded', () => {
         console.log(`[Login] Parent login completed in ${duration}ms`);
 
         if (result.success) {
-          console.log('[Login] Parent login successful, redirecting to dashboard');
+          // Login successful
           // Redirect to dashboard
           window.location.href = CONFIG.ROUTES.DASHBOARD;
         } else {
-          console.log('[Login] Parent login failed:', result.error);
+          // Login failed
           showParentError(result.error || 'Invalid email or password');
           setParentFormLoading(false);
           parentLoginInProgress = false;
@@ -290,7 +290,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
       // Check if a login is already in progress
       if (childLoginInProgress) {
-        console.log('[Login] Child login already in progress, ignoring duplicate submission');
+        // Child login already in progress
         return;
       }
 
@@ -317,7 +317,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
       // Set login in progress flag
       childLoginInProgress = true;
-      console.log('[Login] Starting child login for:', username);
+      // Starting child login for username
 
       // Disable form during submission
       setChildFormLoading(true);
@@ -329,11 +329,11 @@ document.addEventListener('DOMContentLoaded', () => {
         console.log(`[Login] Child login completed in ${duration}ms`);
 
         if (result.success) {
-          console.log('[Login] Child login successful, redirecting to dashboard');
+          // Child login successful
           // Redirect to dashboard
           window.location.href = CONFIG.ROUTES.DASHBOARD;
         } else {
-          console.log('[Login] Child login failed:', result.error);
+          // Child login failed
           showChildError(result.error || 'Invalid username or PIN');
           // Clear PIN inputs
           pinInputs.forEach(input => input.value = '');
@@ -762,6 +762,6 @@ document.addEventListener('DOMContentLoaded', () => {
    }
  }
 
- console.log('[Login] Event handlers attached successfully');
+ // Event handlers attached successfully
 });
 

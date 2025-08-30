@@ -1,3 +1,49 @@
+// Global variables for dashboard state persistence
+window.__dashboardGlobals = window.__dashboardGlobals || {};
+window.__dashboardGlobals.getApprovalsPage = () => parseInt(localStorage.getItem('approvalsPage')) || 1;
+window.__dashboardGlobals.setApprovalsPage = (page) => localStorage.setItem('approvalsPage', page);
+window.__dashboardGlobals.removedIds = window.__dashboardGlobals.removedIds || new Set();
+
+// Temporary suppress for recently approved requests to prevent race condition re-showing
+window.__dashboardGlobals.recentlyApprovedIds = new Set();
+window.__dashboardGlobals.addRecentlyApprovedId = (id) => {
+    window.__dashboardGlobals.recentlyApprovedIds.add(id);
+    // Auto-remove after 10 seconds to prevent memory leaks
+    setTimeout(() => {
+        window.__dashboardGlobals.recentlyApprovedIds.delete(id);
+    }, 10000);
+};
+window.__dashboardGlobals.isRecentlyApproved = (id) => {
+    return window.__dashboardGlobals.recentlyApprovedIds.has(id);
+};
+
+// Global sibling data cache to prevent duplicate API requests
+window.__siblingsCache = {};
+window.__siblingsCache.get = async () => {
+    const now = Date.now();
+    const cacheTimeout = 5 * 60 * 1000; // 5 minutes
+    
+    if (window.__siblingsCache.data && window.__siblingsCache.timestamp && (now - window.__siblingsCache.timestamp) < cacheTimeout) {
+        return window.__siblingsCache.data;
+    }
+    
+    if (window.__siblingsCache.promise) {
+        return await window.__siblingsCache.promise;
+    }
+    
+    // Fetch new data
+    window.__siblingsCache.promise = API.request('/siblings');
+    const sibRes = await window.__siblingsCache.promise;
+    if (sibRes?.success && Array.isArray(sibRes.siblings)) {
+        window.__siblingsCache.data = sibRes;
+        window.__siblingsCache.timestamp = now;
+    } else {
+        window.__siblingsCache.data = null;
+    }
+    window.__siblingsCache.promise = null;
+    return window.__siblingsCache.data;
+};
+
 // Dashboard page functionality
 document.addEventListener('DOMContentLoaded', async () => {
     // console.log('[Dashboard] Initializing dashboard');
@@ -270,53 +316,60 @@ function setupUXHelpers() {
     const btnOk = document.getElementById('confirmOk');
     const btnCancel = document.getElementById('confirmCancel');
 
-    window.openConfirm = ({ title = 'Please Confirm', message = 'Are you sure?', okText = 'OK', cancelText = 'Cancel', okButtonClass = 'btn-primary' } = {}) => {
-        return new Promise((resolve) => {
-            if (!confirmModal) return resolve(confirm(message));
-            confirmTitle.textContent = title;
-            confirmMessage.textContent = message;
-            btnOk.textContent = okText;
-            btnCancel.textContent = cancelText;
-
-            // Apply custom button class
-            btnOk.className = `btn ${okButtonClass}`;
-            if (okButtonClass === 'btn-danger') {
-                btnOk.style.background = '#ef4444';
-                btnOk.style.color = 'white';
-                btnOk.style.borderColor = '#dc2626';
-            } else {
-                // Reset to default primary styles
-                btnOk.style.background = '';
-                btnOk.style.color = '';
-                btnOk.style.borderColor = '';
-            }
-
-            confirmModal.style.display = 'flex';
-
-            let downOnBackdrop = false;
-            const onMouseDown = (e) => { downOnBackdrop = (e.target === confirmModal); };
-            const onTouchStart = (e) => { downOnBackdrop = (e.target === confirmModal); };
-            const onBackdropClick = (e) => {
-                if (e.target === confirmModal && downOnBackdrop) {
-                    cleanup(); resolve(false);
+    window.openConfirm = ({ title = 'Please Confirm', message = 'Are you sure?', okText = 'OK', cancelText = 'Cancel', okButtonClass = 'btn-primary', onOk = null } = {}) => {
+            return new Promise((resolve) => {
+                if (!confirmModal) return resolve(confirm(message));
+                confirmTitle.textContent = title;
+                confirmMessage.textContent = message;
+                btnOk.textContent = okText;
+                btnCancel.textContent = cancelText;
+    
+                // Apply custom button class
+                btnOk.className = `btn ${okButtonClass}`;
+                if (okButtonClass === 'btn-danger') {
+                    btnOk.style.background = '#ef4444';
+                    btnOk.style.color = 'white';
+                    btnOk.style.borderColor = '#dc2626';
+                } else {
+                    // Reset to default primary styles
+                    btnOk.style.background = '';
+                    btnOk.style.color = '';
+                    btnOk.style.borderColor = '';
                 }
-                downOnBackdrop = false;
-            };
-
-            const cleanup = () => {
-                btnOk.onclick = null;
-                btnCancel.onclick = null;
-                confirmModal.removeEventListener('mousedown', onMouseDown);
-                confirmModal.removeEventListener('touchstart', onTouchStart);
-                confirmModal.removeEventListener('click', onBackdropClick);
-                confirmModal.style.display = 'none';
-            };
-            btnOk.onclick = () => { cleanup(); resolve(true); };
-            btnCancel.onclick = () => { cleanup(); resolve(false); };
-            confirmModal.addEventListener('mousedown', onMouseDown);
-            confirmModal.addEventListener('touchstart', onTouchStart, { passive: true });
-            confirmModal.addEventListener('click', onBackdropClick);
-        });
+    
+                confirmModal.style.display = 'flex';
+    
+                let downOnBackdrop = false;
+                const onMouseDown = (e) => { downOnBackdrop = (e.target === confirmModal); };
+                const onTouchStart = (e) => { downOnBackdrop = (e.target === confirmModal); };
+                const onBackdropClick = (e) => {
+                    if (e.target === confirmModal && downOnBackdrop) {
+                        cleanup(); resolve(false);
+                    }
+                    downOnBackdrop = false;
+                };
+    
+                const cleanup = () => {
+                    btnOk.onclick = null;
+                    btnCancel.onclick = null;
+                    confirmModal.removeEventListener('mousedown', onMouseDown);
+                    confirmModal.removeEventListener('touchstart', onTouchStart);
+                    confirmModal.removeEventListener('click', onBackdropClick);
+                    confirmModal.style.display = 'none';
+                };
+                btnOk.onclick = () => {
+                    cleanup();
+                    // Execute callback immediately after modal cleanup for DOM removal
+                    if (onOk && typeof onOk === 'function') {
+                        setTimeout(() => onOk(), 0); // Next tick to ensure modal is fully hidden
+                    }
+                    resolve(true);
+                };
+                btnCancel.onclick = () => { cleanup(); resolve(false); };
+                confirmModal.addEventListener('mousedown', onMouseDown);
+                confirmModal.addEventListener('touchstart', onTouchStart, { passive: true });
+                confirmModal.addEventListener('click', onBackdropClick);
+            });
     };
 }
 
@@ -968,7 +1021,7 @@ async function loadPendingApprovals(options = {}) {
             API.getMoneyAdditionRequests()
         ]);
 
-        const items = [];
+        let items = [];
         if (withdrawals.success && Array.isArray(withdrawals.requests)) {
             withdrawals.requests
                 .filter(r => r.status === 'pending')
@@ -1022,10 +1075,14 @@ async function loadPendingApprovals(options = {}) {
                 childMap[String(c.id)] = { name: c.name, username: c.username };
             });
         }
-
+    
         const pageSize = 5;
-        let currentPage = 1;
+        let currentPage = window.__dashboardGlobals.getApprovalsPage();
         const totalPages = Math.max(1, Math.ceil(items.length / pageSize));
+    
+        // Adjust currentPage if outside bounds
+        if (currentPage > totalPages) currentPage = Math.max(1, totalPages);
+        window.__dashboardGlobals.setApprovalsPage(currentPage);
 
         const renderPage = () => {
             const start = (currentPage - 1) * pageSize;
@@ -1092,6 +1149,7 @@ async function loadPendingApprovals(options = {}) {
             if (pager) {
                 pager.innerHTML = renderPagination(currentPage, totalPages, (page) => {
                     currentPage = page;
+                    window.__dashboardGlobals.setApprovalsPage(page);
                     renderPage();
                 });
             }
@@ -1114,14 +1172,33 @@ function renderPagination(currentPage, totalPages, onPageChange) {
     for (let p = start; p <= end; p++) pages.push(pageBtn(p, p === currentPage));
 
     const html = `${prev}${pages.join('')}${next}`;
+
     // attach click handling after container sets .innerHTML = html
     setTimeout(() => {
-        const container = document.querySelector('.pagination');
-        if (!container) return;
-        Array.from(container.querySelectorAll('.page-btn')).forEach(btn => {
-            btn.addEventListener('click', () => {
+        // Fix: Target the specific pagination container (approvals vs children)
+        const approvalsContainer = document.getElementById('approvalsPagination');
+        const childrenContainer = document.getElementById('childrenPagination');
+
+        // Check which container was just updated based on presence of buttons
+        let targetContainer = null;
+        if (approvalsContainer && approvalsContainer.querySelector('.page-btn')) {
+            targetContainer = approvalsContainer;
+        } else if (childrenContainer && childrenContainer.querySelector('.page-btn')) {
+            targetContainer = childrenContainer;
+        }
+
+        if (!targetContainer) return;
+
+        const buttons = targetContainer.querySelectorAll('.page-btn');
+
+        buttons.forEach((btn) => {
+            btn.addEventListener('click', (e) => {
+                e.preventDefault();
+                e.stopPropagation();
                 const p = Number(btn.getAttribute('data-page'));
-                if (p && p >= 1 && p <= totalPages) onPageChange(p);
+                if (p && p >= 1 && p <= totalPages) {
+                    onPageChange(p);
+                }
             });
         });
     }, 0);
@@ -1136,21 +1213,62 @@ function renderPagination(currentPage, totalPages, onPageChange) {
 
 // Parent approval handlers
 window.approveWithdrawal = async function(id) {
+    // Timings removed for production
+    console.log('[APPROVE WITHDRAWAL] Started at', startTime, 'ms with ID:', id);
+    showToast('approveWithdrawal function called!', `ID: ${id}`, 'info');
+
+    const approvalsListEl = document.getElementById('approvalsList');
+    const prevScroll = approvalsListEl ? approvalsListEl.scrollTop : 0;
+
+    // Find row first
+    const row = document.querySelector(`.approval-item[data-kind="withdrawal"][data-id="${id}"]`) || document.querySelector(`.approval-item [onclick="approveWithdrawal('${id}')"]`)?.closest('.approval-item');
+    console.log('[APPROVE WITHDRAWAL] Found row for id', id, 'at', performance.now() - startTime, 'ms:', row);
+
+    // Prepare DOM removal function to execute immediately when modal closes
+    const performImmediateDomRemoval = () => {
+        if (row) {
+            // Check item count before removal
+            const itemsBefore = document.querySelectorAll('.approval-item').length;
+            console.log('[APPROVE WITHDRAWAL] Items before removal:', itemsBefore);
+
+            // Mark as removing for visual feedback and remove immediately
+            row.classList.add('removing');
+            row.remove();
+
+            console.log('[APPROVE WITHDRAWAL] IMMEDIATE DOM removal completed at', performance.now() - startTime, 'ms');
+
+            // Verify removal with delayed check
+            setTimeout(() => {
+                const itemsAfter = document.querySelectorAll('.approval-item').length;
+                console.log('[APPROVE WITHDRAWAL] Items after removal (100ms check):', itemsAfter, 'removed:', itemsBefore - itemsAfter);
+                const stillExists = document.querySelector(`.approval-item[data-kind="withdrawal"][data-id="${id}"]`);
+                console.log('[APPROVE WITHDRAWAL] Row still exists?', !!stillExists);
+            }, 100);
+        }
+    };
+
     try {
-        const ok = await openConfirm({ title: 'Approve Withdrawal', message: 'Approve this withdrawal request?', okText: 'Approve' });
+        const ok = await openConfirm({
+            title: 'Approve Withdrawal',
+            message: 'Approve this withdrawal request?',
+            okText: 'Approve',
+            onOk: performImmediateDomRemoval  // Execute DOM removal immediately when modal closes
+        });
         if (!ok) return;
 
-        const approvalsListEl = document.getElementById('approvalsList');
-        const prevScroll = approvalsListEl ? approvalsListEl.scrollTop : 0;
-
-        const row = document.querySelector(`.approval-item[data-kind="withdrawal"][data-id="${id}"]`) || document.querySelector(`.approval-item [onclick="approveWithdrawal('${id}')"]`)?.closest('.approval-item');
+        // Get override amount from the row (find row again since it got moved up)
+        const freshRow = document.querySelector(`.approval-item[data-kind="withdrawal"][data-id="${id}"]`) || document.querySelector(`.approval-item [onclick="approveWithdrawal('${id}')"]`)?.closest('.approval-item');
         let overrideAmount;
-        if (row) {
-            row.querySelectorAll('button').forEach(btn => btn.disabled = true);
-            const input = row.querySelector('.approval-amount-input');
+        if (freshRow) {
+            freshRow.querySelectorAll('button').forEach(btn => btn.disabled = true);
+            const input = freshRow.querySelector('.approval-amount-input');
             if (input) {
                 const v = parseFloat(input.value);
-                if (!isFinite(v) || v <= 0) { showToast('Invalid amount', 'Enter a positive number', 'error'); row.querySelectorAll('button').forEach(btn => btn.disabled = false); return; }
+                if (!isFinite(v) || v <= 0) {
+                    showToast('Invalid amount', 'Enter a positive number', 'error');
+                    freshRow.querySelectorAll('button').forEach(btn => btn.disabled = false);
+                    return;
+                }
                 overrideAmount = Number(v.toFixed(2));
             }
         }
@@ -1159,12 +1277,13 @@ window.approveWithdrawal = async function(id) {
             if (isFinite(m) && m > 0) overrideAmount = Number(m.toFixed(2));
         }
 
+        const apiStartTime = performance.now();
         const res = await API.approveWithdrawalRequest(id, overrideAmount);
+        console.log('[APPROVE WITHDRAWAL] API call took', performance.now() - apiStartTime, 'ms');
+
         if (res.success) {
             showToast('Withdrawal approved', '', 'success');
-
-            // Remove row
-            if (row && row.parentElement) row.parentElement.removeChild(row);
+            console.log('[APPROVE WITHDRAWAL] API success at', performance.now() - startTime, 'ms');
 
             // Decrement pending counter
             const pendingCount = document.getElementById('pendingRequests');
@@ -1172,6 +1291,9 @@ window.approveWithdrawal = async function(id) {
                 const n = parseInt(pendingCount.textContent || '0', 10);
                 if (!isNaN(n)) pendingCount.textContent = String(Math.max(0, n - 1));
             }
+
+            // Mark this request as recently approved to prevent race condition re-showing
+            window.__dashboardGlobals.addRecentlyApprovedId(id);
 
             // Update child balance in place if available
             const childId = row?.getAttribute('data-child-id');
@@ -1239,6 +1361,19 @@ window.approveWithdrawal = async function(id) {
         }
     } catch (e) {
         console.error('Approve withdrawal failed', e);
+        // Debug: Log all approval items and find matches
+        const allItems = document.querySelectorAll('.approval-item');
+        console.log('[APPROVE WITHDRAWAL] All approval items:', allItems.length);
+        showToast('Processing approval...', '', 'info'); // Immediate visual feedback
+
+        allItems.forEach((item, i) => {
+            console.log(`[APPROVE WITHDRAWAL] Item ${i}:`, {
+                kind: item.getAttribute('data-kind'),
+                id: item.getAttribute('data-id'),
+                match: item.getAttribute('data-id') === id && item.getAttribute('data-kind') === 'withdrawal'
+            });
+        });
+
         const row = document.querySelector(`.approval-item[data-kind="withdrawal"][data-id="${id}"]`) || document.querySelector(`.approval-item [onclick="approveWithdrawal('${id}')"]`)?.closest('.approval-item');
         if (row) row.querySelectorAll('button').forEach(btn => btn.disabled = false);
 
@@ -1286,6 +1421,8 @@ window.approveWithdrawal = async function(id) {
     }
 };
 window.rejectWithdrawalPrompt = async function(id) {
+    // Timings removed for production
+    console.log('[REJECT WITHDRAWAL] Started at', startTime, 'ms with ID:', id);
     try {
         const promptRes = await openTextPrompt({ title: 'Reject Withdrawal', message: 'Add a reason (optional):', placeholder: 'Reason (optional)', okText: 'Reject', cancelText: 'Cancel' });
         if (!promptRes || promptRes.cancelled) return;
@@ -1293,12 +1430,41 @@ window.rejectWithdrawalPrompt = async function(id) {
         if (!ok) return;
 
         const row = document.querySelector(`.approval-item[data-kind="withdrawal"][data-id="${id}"]`) || document.querySelector(`.approval-item [onclick="rejectWithdrawalPrompt('${id}')"]`)?.closest('.approval-item');
+        console.log('[REJECT WITHDRAWAL] Found row for id', id, 'at', performance.now() - startTime, 'ms:', row);
         if (row) row.querySelectorAll('button').forEach(btn => btn.disabled = true);
 
+        const apiStartTime = performance.now();
         const res = await API.rejectWithdrawalRequest(id, promptRes.value || '');
+        console.log('[REJECT WITHDRAWAL] API call took', performance.now() - apiStartTime, 'ms');
+
         if (res.success) {
             showToast('Withdrawal rejected');
-            if (row && row.parentElement) row.parentElement.removeChild(row);
+            console.log('[REJECT WITHDRAWAL] Removing row at', performance.now() - startTime, 'ms:', row);
+
+            // Check item count before removal
+            const itemsBefore = document.querySelectorAll('.approval-item').length;
+            console.log('[REJECT WITHDRAWAL] Total items before removal:', itemsBefore);
+
+            // Use consistent removal method
+            if (row && row.parentElement) {
+                // Mark as removing for visual feedback
+                row.classList.add('removing');
+                // Use remove() method which is more direct
+                row.remove();
+                console.log('[REJECT WITHDRAWAL] Row removed successfully at', performance.now() - startTime, 'ms');
+            } else {
+                console.log('[REJECT WITHDRAWAL] Could not remove row - row not found or no parent');
+            }
+
+            // Force repaint and check timing
+            setTimeout(() => {
+                const itemsAfter = document.querySelectorAll('.approval-item').length;
+                console.log('[REJECT WITHDRAWAL] Items after removal (100ms check):', itemsAfter, 'removed:', itemsBefore - itemsAfter);
+                const stillExists = document.querySelector(`.approval-item[data-kind="withdrawal"][data-id="${id}"]`);
+                console.log('[REJECT WITHDRAWAL] Row still exists?', !!stillExists);
+            }, 100);
+
+            console.log('[REJECT WITHDRAWAL] Total operation time:', performance.now() - startTime, 'ms');
 
             const pendingCount = document.getElementById('pendingRequests');
             if (pendingCount) {
@@ -1306,6 +1472,8 @@ window.rejectWithdrawalPrompt = async function(id) {
                 if (!isNaN(n)) pendingCount.textContent = String(Math.max(0, n - 1));
             }
             if (window.__approvalEdits) delete window.__approvalEdits[id];
+            // Refresh the list to reflect updates and adjust pagination if needed
+            loadPendingApprovals({ soft: true });
         } else {
             showToast('Failed to reject', res.error || '', 'error');
             if (row) row.querySelectorAll('button').forEach(btn => btn.disabled = false);
@@ -1316,21 +1484,61 @@ window.rejectWithdrawalPrompt = async function(id) {
     }
 };
 window.approveTransfer = async function(id) {
+    // Timings removed for production
+    console.log('[APPROVE TRANSFER] Started at', startTime, 'ms with ID:', id);
+
+    const approvalsListEl = document.getElementById('approvalsList');
+    const prevScroll = approvalsListEl ? approvalsListEl.scrollTop : 0;
+
+    // Find row first
+    const row = document.querySelector(`.approval-item[data-kind="transfer"][data-id="${id}"]`) || document.querySelector(`.approval-item [onclick="approveTransfer('${id}')"]`)?.closest('.approval-item');
+    console.log('[APPROVE TRANSFER] Found row for id', id, 'at', performance.now() - startTime, 'ms:', row);
+
+    // Prepare DOM removal function to execute immediately when modal closes
+    const performImmediateDomRemoval = () => {
+        if (row) {
+            // Check item count before removal
+            const itemsBefore = document.querySelectorAll('.approval-item').length;
+            console.log('[APPROVE TRANSFER] Items before removal:', itemsBefore);
+
+            // Mark as removing for visual feedback and remove immediately
+            row.classList.add('removing');
+            row.remove();
+
+            console.log('[APPROVE TRANSFER] IMMEDIATE DOM removal completed at', performance.now() - startTime, 'ms');
+
+            // Verify removal with delayed check
+            setTimeout(() => {
+                const itemsAfter = document.querySelectorAll('.approval-item').length;
+                console.log('[APPROVE TRANSFER] Items after removal (100ms check):', itemsAfter, 'removed:', itemsBefore - itemsAfter);
+                const stillExists = document.querySelector(`.approval-item[data-kind="transfer"][data-id="${id}"]`);
+                console.log('[APPROVE TRANSFER] Row still exists?', !!stillExists);
+            }, 100);
+        }
+    };
+
     try {
-        const ok = await openConfirm({ title: 'Approve Transfer', message: 'Approve this transfer request?', okText: 'Approve' });
+        const ok = await openConfirm({
+            title: 'Approve Transfer',
+            message: 'Approve this transfer request?',
+            okText: 'Approve',
+            onOk: performImmediateDomRemoval  // Execute DOM removal immediately when modal closes
+        });
         if (!ok) return;
 
-        const approvalsListEl = document.getElementById('approvalsList');
-        const prevScroll = approvalsListEl ? approvalsListEl.scrollTop : 0;
-
-        const row = document.querySelector(`.approval-item[data-kind="transfer"][data-id="${id}"]`) || document.querySelector(`.approval-item [onclick="approveTransfer('${id}')"]`)?.closest('.approval-item');
+        // Get override amount from the row (find row again since it got moved up)
+        const freshRow = document.querySelector(`.approval-item[data-kind="transfer"][data-id="${id}"]`) || document.querySelector(`.approval-item [onclick="approveTransfer('${id}')"]`)?.closest('.approval-item');
         let overrideAmount;
-        if (row) {
-            row.querySelectorAll('button').forEach(btn => btn.disabled = true);
-            const input = row.querySelector('.approval-amount-input');
+        if (freshRow) {
+            freshRow.querySelectorAll('button').forEach(btn => btn.disabled = true);
+            const input = freshRow.querySelector('.approval-amount-input');
             if (input) {
                 const v = parseFloat(input.value);
-                if (!isFinite(v) || v <= 0) { showToast('Invalid amount', 'Enter a positive number', 'error'); row.querySelectorAll('button').forEach(btn => btn.disabled = false); return; }
+                if (!isFinite(v) || v <= 0) {
+                    showToast('Invalid amount', 'Enter a positive number', 'error');
+                    freshRow.querySelectorAll('button').forEach(btn => btn.disabled = false);
+                    return;
+                }
                 overrideAmount = Number(v.toFixed(2));
             }
         }
@@ -1339,17 +1547,22 @@ window.approveTransfer = async function(id) {
             if (isFinite(m) && m > 0) overrideAmount = Number(m.toFixed(2));
         }
 
+        const apiStartTime = performance.now();
         const res = await API.approveTransferRequest(id, overrideAmount);
+        console.log('[APPROVE TRANSFER] API call took', performance.now() - apiStartTime, 'ms');
+
         if (res.success) {
             showToast('Transfer approved', '', 'success');
-
-            if (row && row.parentElement) row.parentElement.removeChild(row);
+            console.log('[APPROVE TRANSFER] API success at', performance.now() - startTime, 'ms');
 
             const pendingCount = document.getElementById('pendingRequests');
             if (pendingCount) {
                 const n = parseInt(pendingCount.textContent || '0', 10);
                 if (!isNaN(n)) pendingCount.textContent = String(Math.max(0, n - 1));
             }
+
+            // Mark this request as recently approved to prevent race condition re-showing
+            window.__dashboardGlobals.addRecentlyApprovedId(id);
 
             const fromChildId = row?.getAttribute('data-from-child-id');
             const toChildId = row?.getAttribute('data-to-child-id');
@@ -1364,6 +1577,8 @@ window.approveTransfer = async function(id) {
 
             if (window.__approvalEdits) delete window.__approvalEdits[id];
             if (approvalsListEl) approvalsListEl.scrollTop = prevScroll;
+            // Refresh the list to reflect updates and adjust pagination if needed
+            loadPendingApprovals({ soft: true });
         } else {
             // Friendlier, actionable error handling (keep row interactive, no page reload needed)
             const apiMsg = (res && (res.error || res.message || '')) || '';
@@ -1477,6 +1692,8 @@ window.rejectTransferPrompt = async function(id) {
                 if (!isNaN(n)) pendingCount.textContent = String(Math.max(0, n - 1));
             }
             if (window.__approvalEdits) delete window.__approvalEdits[id];
+            // Refresh the list to reflect updates and adjust pagination if needed
+            loadPendingApprovals({ soft: true });
         } else {
             showToast('Failed to reject', res.error || '', 'error');
             if (row) row.querySelectorAll('button').forEach(btn => btn.disabled = false);
@@ -1489,21 +1706,61 @@ window.rejectTransferPrompt = async function(id) {
 
 // Money addition approval handlers
 window.approveMoneyAddition = async function(id) {
+    // Timings removed for production
+    console.log('[APPROVE MONEY ADDITION] Started at', startTime, 'ms with ID:', id);
+
+    const approvalsListEl = document.getElementById('approvalsList');
+    const prevScroll = approvalsListEl ? approvalsListEl.scrollTop : 0;
+
+    // Find row first
+    const row = document.querySelector(`.approval-item[data-kind="money_addition"][data-id="${id}"]`) || document.querySelector(`.approval-item [onclick="approveMoneyAddition('${id}')"]`)?.closest('.approval-item');
+    console.log('[APPROVE MONEY ADDITION] Found row for id', id, 'at', performance.now() - startTime, 'ms:', row);
+
+    // Prepare DOM removal function to execute immediately when modal closes
+    const performImmediateDomRemoval = () => {
+        if (row) {
+            // Check item count before removal
+            const itemsBefore = document.querySelectorAll('.approval-item').length;
+            console.log('[APPROVE MONEY ADDITION] Items before removal:', itemsBefore);
+
+            // Mark as removing for visual feedback and remove immediately
+            row.classList.add('removing');
+            row.remove();
+
+            console.log('[APPROVE MONEY ADDITION] IMMEDIATE DOM removal completed at', performance.now() - startTime, 'ms');
+
+            // Verify removal with delayed check
+            setTimeout(() => {
+                const itemsAfter = document.querySelectorAll('.approval-item').length;
+                console.log('[APPROVE MONEY ADDITION] Items after removal (100ms check):', itemsAfter, 'removed:', itemsBefore - itemsAfter);
+                const stillExists = document.querySelector(`.approval-item[data-kind="money_addition"][data-id="${id}"]`);
+                console.log('[APPROVE MONEY ADDITION] Row still exists?', !!stillExists);
+            }, 100);
+        }
+    };
+
     try {
-        const ok = await openConfirm({ title: 'Approve Money Request', message: 'Approve this money addition request?', okText: 'Approve' });
+        const ok = await openConfirm({
+            title: 'Approve Money Request',
+            message: 'Approve this money addition request?',
+            okText: 'Approve',
+            onOk: performImmediateDomRemoval  // Execute DOM removal immediately when modal closes
+        });
         if (!ok) return;
 
-        const approvalsListEl = document.getElementById('approvalsList');
-        const prevScroll = approvalsListEl ? approvalsListEl.scrollTop : 0;
-
-        const row = document.querySelector(`.approval-item[data-kind="money_addition"][data-id="${id}"]`) || document.querySelector(`.approval-item [onclick="approveMoneyAddition('${id}')"]`)?.closest('.approval-item');
+        // Get override amount from the row (find row again since it got moved up)
+        const freshRow = document.querySelector(`.approval-item[data-kind="money_addition"][data-id="${id}"]`) || document.querySelector(`.approval-item [onclick="approveMoneyAddition('${id}')"]`)?.closest('.approval-item');
         let overrideAmount;
-        if (row) {
-            row.querySelectorAll('button').forEach(btn => btn.disabled = true);
-            const input = row.querySelector('.approval-amount-input');
+        if (freshRow) {
+            freshRow.querySelectorAll('button').forEach(btn => btn.disabled = true);
+            const input = freshRow.querySelector('.approval-amount-input');
             if (input) {
                 const v = parseFloat(input.value);
-                if (!isFinite(v) || v <= 0) { showToast('Invalid amount', 'Enter a positive number', 'error'); row.querySelectorAll('button').forEach(btn => btn.disabled = false); return; }
+                if (!isFinite(v) || v <= 0) {
+                    showToast('Invalid amount', 'Enter a positive number', 'error');
+                    freshRow.querySelectorAll('button').forEach(btn => btn.disabled = false);
+                    return;
+                }
                 overrideAmount = Number(v.toFixed(2));
             }
         }
@@ -1515,14 +1772,10 @@ window.approveMoneyAddition = async function(id) {
         const res = await API.approveMoneyAdditionRequest(id, overrideAmount);
         if (res.success) {
             showToast('Money request approved', '', 'success');
+            console.log('[APPROVE MONEY ADDITION] API success at', performance.now() - startTime, 'ms');
 
-            if (row && row.parentElement) row.parentElement.removeChild(row);
-
-            const pendingCount = document.getElementById('pendingRequests');
-            if (pendingCount) {
-                const n = parseInt(pendingCount.textContent || '0', 10);
-                if (!isNaN(n)) pendingCount.textContent = String(Math.max(0, n - 1));
-            }
+            // Mark this request as recently approved to prevent race condition re-showing
+            window.__dashboardGlobals.addRecentlyApprovedId(id);
 
             // Update the child's displayed balance if available from server response
             const childId = row?.getAttribute('data-child-id');
@@ -1543,6 +1796,8 @@ window.approveMoneyAddition = async function(id) {
 
             if (window.__approvalEdits) delete window.__approvalEdits[id];
             if (approvalsListEl) approvalsListEl.scrollTop = prevScroll;
+            // Refresh the list to reflect updates and adjust pagination if needed
+            loadPendingApprovals({ soft: true });
         } else {
             showToast('Failed to approve', res.error || 'Please try again', 'error');
             if (row) row.querySelectorAll('button').forEach(btn => btn.disabled = false);
@@ -1574,6 +1829,8 @@ window.rejectMoneyAdditionPrompt = async function(id) {
                 if (!isNaN(n)) pendingCount.textContent = String(Math.max(0, n - 1));
             }
             if (window.__approvalEdits) delete window.__approvalEdits[id];
+            // Refresh the list to reflect updates and adjust pagination if needed
+            loadPendingApprovals({ soft: true });
         } else {
             showToast('Failed to reject', res.error || '', 'error');
             if (row) row.querySelectorAll('button').forEach(btn => btn.disabled = false);
@@ -1912,7 +2169,7 @@ function setupChildActions() {
                     if (select) {
                         // Reset options each time
                         select.innerHTML = '<option value="">Select a sibling</option>';
-                        const res = await API.request('/siblings');
+                        const res = await window.__siblingsCache.get();
 
                         // Ignore if a newer click started a newer request
                         if (seq !== transferBtn.__siblingsReqSeq) return;
@@ -2033,6 +2290,73 @@ window.removeMoney = function(childId, childName) {
         });
     }
 }
+
+// Simple test to verify JavaScript is working
+window.testDashboardJS = function() {
+    console.log('[TEST] Dashboard JavaScript loaded successfully');
+    showToast('Dashboard JS Working', 'Function called successfully', 'success');
+    return true;
+};
+
+// Debug button clicks
+window.debugApprovalClick = function(event, actionType, id) {
+    console.log('[DEBUG] Click detected for', actionType, id);
+    console.log('[DEBUG] Event target:', event.target);
+    if (event && event.target) {
+        event.target.style.backgroundColor = '#ff0000';
+        setTimeout(() => {
+            if (event.target) event.target.style.backgroundColor = '';
+        }, 500);
+    }
+    return false;
+};
+
+// Debug function to verify immediate DOM updates
+window.debugApprovalAction = function(actionType, id) {
+    const beforeRemove = document.querySelectorAll('.approval-item').length;
+    console.log(`[DEBUG] Before ${actionType} for ${id}: ${beforeRemove} items`);
+    // Check if specific row exists
+    const row = document.querySelector(`.approval-item[data-kind="${actionType.startsWith('reject') ? 'withdrawal' : actionType}"][data-id="${id}"]`);
+    console.log(`[DEBUG] Row found for ${actionType} ${id}:`, !!row);
+    if (row) {
+        row.parentElement.removeChild(row);
+        const afterRemove = document.querySelectorAll('.approval-item').length;
+        console.log(`[DEBUG] After ${actionType} for ${id}: ${afterRemove} items (removed: ${beforeRemove - afterRemove})`);
+    } else {
+        console.log(`[DEBUG] Row NOT found for ${actionType} ${id}`);
+    }
+};
+
+// Test function to verify approval removals are working
+window.testImmediateRemoval = function() {
+    const itemsBefore = document.querySelectorAll('.approval-item').length;
+    console.log(`[TEST] Total approval items before: ${itemsBefore}`);
+    showToast(`Found ${itemsBefore} approval items`, 'Click to test removal', 'info');
+
+    // Test withdrawal removal
+    const withdrawalRows = document.querySelectorAll('.approval-item[data-kind="withdrawal"]');
+    if (withdrawalRows.length > 0) {
+        const testRow = withdrawalRows[0];
+        const testId = testRow.getAttribute('data-id');
+        console.log(`[TEST] Testing withdrawal removal with ID: ${testId}`);
+
+        // Simulate removal like our code does
+        if (testRow && testRow.parentElement) {
+            const itemsBeforeRemove = document.querySelectorAll('.approval-item').length;
+            testRow.remove();
+            const itemsAfterRemove = document.querySelectorAll('.approval-item').length;
+            console.log(`[TEST] Items before removal: ${itemsBeforeRemove}, after: ${itemsAfterRemove}`);
+            console.log(`[TEST] Removal successful: ${itemsBeforeRemove > itemsAfterRemove}`);
+            showToast('Test Removal Successful', `Removed item ${testId}`, 'success');
+        } else {
+            console.log(`[TEST] Could not remove test row`);
+            showToast('Test Removal Failed', 'Could not remove test row', 'error');
+        }
+    } else {
+        console.log(`[TEST] No withdrawal rows found to test`);
+        showToast('No Test Rows', 'No withdrawal requests to test with', 'info');
+    }
+};
 
 // Global functions for button clicks
 window.addMoney = function(childId, childName) {
@@ -2303,7 +2627,7 @@ async function loadChildPendingRequests(options = {}) {
             API.getTransferRequests(),
             API.getMoneyAdditionRequests()
         ]);
-        const items = [];
+        let items = [];
         if (withdrawals.success && Array.isArray(withdrawals.requests)) {
             withdrawals.requests
                 .filter(r => r.status === 'pending')
@@ -2318,7 +2642,7 @@ async function loadChildPendingRequests(options = {}) {
             const me = Auth.getUser();
             let siblingMap = {};
             try {
-                const sibRes = await API.request('/siblings');
+                const sibRes = await window.__siblingsCache.get();
                 if (sibRes?.success && Array.isArray(sibRes.siblings)) {
                     sibRes.siblings.forEach(s => { siblingMap[String(s.id)] = s.name; });
                 }
@@ -2349,8 +2673,20 @@ async function loadChildPendingRequests(options = {}) {
                     amount: r.amount
                 }));
         }
+        
+        // Filter out locally removed ids and recently approved requests
+        items = items.filter(item => !window.__dashboardGlobals.removedIds.has(item.id));
+        // Additionally filter out recently approved requests to prevent race condition re-showing
+        items = items.filter(item => !window.__dashboardGlobals.isRecentlyApproved(item.id));
 
-        if (items.length === 0) {
+        // Clean the set by removing ids that are no longer pending on server
+        window.__dashboardGlobals.removedIds.forEach(id => {
+            if (!items.some(item => item.id === id)) {
+                window.__dashboardGlobals.removedIds.delete(id);
+            }
+        });
+        
+                if (items.length === 0) {
             container.innerHTML = '<p class="no-data">No pending requests</p>';
             return;
         }

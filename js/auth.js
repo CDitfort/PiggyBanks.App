@@ -151,7 +151,7 @@ const Auth = (function() {
         
         // Check if we have a pending request for the same operation
         if (!options.allowDuplicate && pendingRequests.has(requestKey)) {
-            console.log(`[Auth] Duplicate request detected, waiting for existing: ${requestKey}`);
+            // Duplicate request detected
             return pendingRequests.get(requestKey);
         }
         
@@ -335,7 +335,7 @@ const Auth = (function() {
          */
         async loginParent(email, password) {
             try {
-                console.log('[Auth] Parent login attempt for:', email);
+                // Parent login attempt
                 const recaptchaToken = await getRecaptchaToken('login_parent');
                 const result = await makeAuthRequest('/login', 'POST', {
                     email,
@@ -346,7 +346,7 @@ const Auth = (function() {
                 
                 if (result.success) {
                     storeAuthData(result.token, result.user);
-                    console.log('[Auth] Parent login successful');
+                    // Login successful
                     return { success: true, message: result.message };
                 }
                 
@@ -362,7 +362,7 @@ const Auth = (function() {
          */
         async loginChild(username, pin) {
             try {
-                console.log('[Auth] Child login attempt for:', username);
+                // Child login attempt
                 const recaptchaToken = await getRecaptchaToken('login_child');
                 const result = await makeAuthRequest('/login', 'POST', {
                     username,
@@ -370,10 +370,10 @@ const Auth = (function() {
                     role: 'child',
                     recaptchaToken
                 });
-                
+
                 if (result.success) {
                     storeAuthData(result.token, result.user);
-                    console.log('[Auth] Child login successful');
+                    // Login successful
                     return { success: true, message: result.message, user: result.user };
                 }
 
@@ -477,7 +477,7 @@ const Auth = (function() {
         const isPublicPage = publicPages.some(page => currentPage.endsWith(page));
         
         if (isPublicPage) {
-            console.log('[Auth] Public page detected, skipping token verification');
+            // Public page detected, skipping token verification
             return;
         }
         
@@ -486,13 +486,11 @@ const Auth = (function() {
             // console.log('[Auth] Protected page detected, verifying token...');
             const isValid = await Auth.verifyToken();
             if (!isValid) {
-                console.log('[Auth] Token invalid, redirecting to login');
+                // Token invalid, redirecting to login
                 window.location.href = CONFIG.ROUTES.LOGIN;
-            } else {
-                // console.log('[Auth] Token verified successfully');
             }
         } else {
-            console.log('[Auth] No authentication found on protected page, redirecting to login');
+            // No authentication found on protected page, redirecting to login
             window.location.href = CONFIG.ROUTES.LOGIN;
         }
     }

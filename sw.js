@@ -16,7 +16,8 @@ const CORE_ASSETS = [
   '/js/register.js',
   '/js/api.js',
   '/js/dashboard.js',
-  '/manifest.webmanifest'
+  '/manifest.webmanifest',
+  '/images/piggy-bank-icon-smaller.png'
 ];
 
 self.addEventListener('install', (event) => {
