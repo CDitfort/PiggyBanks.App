@@ -2,6 +2,10 @@
 
 A children's chore money tracking application that allows parents to manage their children's virtual piggy banks.
 
+## Live Demo
+
+[https://piggybanks.app](https://piggybanks.app)
+
 ## Features
 
 - Parent registration and authentication
@@ -9,7 +13,7 @@ A children's chore money tracking application that allows parents to manage thei
 - Chore money tracking and balance management
 - Withdrawal and transfer requests with parental approval
 - Transaction history for transparency
-- Secure authentication via Firebase
+- Secure authentication via Netlify Functions
 - Data storage with MongoDB Atlas
 
 ## Project Structure
@@ -23,7 +27,7 @@ piggybanks-app/
 ├── css/
 │   └── styles.css    # Main stylesheet
 ├── js/
-│   ├── firebase-config.js  # Firebase configuration
+│   ├── config.js  # App configuration
 │   ├── auth.js            # Authentication logic
 │   ├── dashboard.js       # Dashboard functionality
 │   └── db.js              # MongoDB connection and operations
@@ -32,7 +36,7 @@ piggybanks-app/
 
 ## Setup Instructions
 
-1. Configure Firebase project
+1. Configure Netlify site and functions
 2. Set up MongoDB Atlas cluster
 3. Update configuration files with your credentials
-4. Deploy to web server
+4. Deploy to Netlify
