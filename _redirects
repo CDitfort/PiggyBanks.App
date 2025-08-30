@@ -1,15 +1,15 @@
-# Netlify redirects for clean URLs and API routing
-/register.html  /register  200
-/login.html     /login     200
-/dashboard.html /dashboard 200
-/index.html     /          200
-/               /index.html 200
+# Netlify redirects for clean URLs
+/*              /index.html  200
 
 # API routes
 /api/*          /.netlify/functions/auth/:splat  200
 
-# Serve .html files for clean URLs
-/*              /index.html  200
+# Handle clean URLs for .html files (user types /register -> serves /register.html)
+/register       /register.html  200
+/login          /login.html  200
+/dashboard      /dashboard.html  200
 
-# Catch all for SPA routing
-/*              /index.html  200
+# Handle .html requests (user types /register.html -> serves /register.html)
+/register.html  /register.html  200
+/login.html     /login.html  200
+/dashboard.html /dashboard.html  200
