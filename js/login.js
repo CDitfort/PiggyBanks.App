@@ -91,14 +91,17 @@ document.addEventListener('DOMContentLoaded', () => {
   function startLoginTips() {
     if (!tipsPanel || tipsActive) return;
     tipsActive = true;
-    // Reset shown tips for new session
+    // Reset shown tips for new session (if applicable)
     shownTipIndices = [];
     tipsPanel.style.display = '';
-    renderTip();
-    if (tipsIntervalId) clearInterval(tipsIntervalId);
-    tipsIntervalId = setInterval(renderTip, 5000);
-    // animate progress bar
-    if (progressFillEl) {
+    // Only render and cycle tips if text element exists
+    if (tipTextEl) {
+      renderTip();
+      if (tipsIntervalId) clearInterval(tipsIntervalId);
+      tipsIntervalId = setInterval(renderTip, 5000);
+    }
+    // Only animate progress bar if progress element exists
+    if (progressFillEl && progressEl) {
       progressFillEl.style.width = '0%';
       let elapsed = 0;
       const step = 100; // ms
@@ -123,6 +126,8 @@ document.addEventListener('DOMContentLoaded', () => {
       window.__loginProgressTimer = null;
     }
     if (tipsPanel) tipsPanel.style.display = 'none';
+    // Reset shown tips
+    shownTipIndices = [];
   }
 
 

@@ -1290,13 +1290,13 @@ img[src^="chrome-extension://ohcpnigalekghcmgcdcenkpelffpdolg/"] {
     margin: 0 auto 1rem;
 }
 
-/* Login Loading Tips Panel */
+/* Login Loading Spinner Panel */
 .loading-tips {
-    display: inline-block;                 /* shrink to content width */
-    text-align: center;
+    display: flex;
+    justify-content: center;
+    align-items: center;
     padding: var(--space-3) var(--space-4); /* comfy padding */
     background: white;
-    border: 1px solid var(--neutral-200);
     border-radius: var(--radius-xl);       /* rounded to match design */
     margin: var(--space-4) auto 0;         /* center within loading block */
     animation: fadeIn var(--transition-fast) ease-in;
