@@ -1,6 +1,6 @@
 {
   "name": "Piggybank App",
-  "short_name": "Piggybanks",
+  "short_name": "Piggybank App",
   "description": "Children's chore money tracker",
   "start_url": "/",
   "scope": "/",
