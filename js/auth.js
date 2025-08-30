@@ -472,15 +472,15 @@ const Auth = (function() {
         // Skip verification on public pages
         const currentPage = window.location.pathname;
         const publicPages = [CONFIG.ROUTES.LOGIN, CONFIG.ROUTES.REGISTER, CONFIG.ROUTES.HOME, '/', '/index.html', '/login.html', '/register.html'];
-        
+
         // Check if current page is a public page
         const isPublicPage = publicPages.some(page => currentPage.endsWith(page));
-        
+
         if (isPublicPage) {
             // Public page detected, skipping token verification
             return;
         }
-        
+
         // For protected pages, verify authentication
         if (Auth.isAuthenticated()) {
             // console.log('[Auth] Protected page detected, verifying token...');
