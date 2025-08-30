@@ -471,7 +471,7 @@ const Auth = (function() {
     async function verifyAuthOnLoad() {
         // Skip verification on public pages
         const currentPage = window.location.pathname;
-        const publicPages = [CONFIG.ROUTES.LOGIN, CONFIG.ROUTES.REGISTER, CONFIG.ROUTES.HOME, '/', '/index.html', '/login.html', '/register.html'];
+        const publicPages = [CONFIG.ROUTES.LOGIN, CONFIG.ROUTES.REGISTER, CONFIG.ROUTES.HOME, '/', '/index', '/login', '/register'];
 
         // Check if current page is a public page
         const isPublicPage = publicPages.some(page => currentPage.endsWith(page));

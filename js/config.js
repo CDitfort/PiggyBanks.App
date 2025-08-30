@@ -26,10 +26,10 @@ const CONFIG = {
 
     // Routes
     ROUTES: {
-        LOGIN: '/login.html',
-        REGISTER: '/register.html',
-        DASHBOARD: '/dashboard.html',
-        HOME: '/index.html'
+        LOGIN: '/login',
+        REGISTER: '/register',
+        DASHBOARD: '/dashboard',
+        HOME: '/'
     }
 };
 

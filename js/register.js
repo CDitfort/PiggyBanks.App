@@ -2,8 +2,20 @@
 function setupRegisterPage() {
     // Ensure reCAPTCHA v3 badge loads promptly on this page
     try { Auth.preloadRecaptcha('register_page'); } catch (e) {}
-    // Redirect if already authenticated
-    Auth.redirectIfAuthenticated();
+
+    // Check if authenticated and show a warning instead of redirecting
+    if (Auth.isAuthenticated()) {
+        // const user = Auth.getUser();
+        const warningMsg = document.querySelector('.auth-footer');
+        if (warningMsg) {
+            const existingP = warningMsg.querySelector('p');
+            if (existingP) {
+                existingP.innerHTML = '<strong>Note:</strong> You\'re already logged in. Registering again will sign you out.';
+            }
+        }
+    }
+    // Do not redirect - allow them to stay and register if they want
+    // Auth.redirectIfAuthenticated();
     
     const form = document.getElementById('registerForm');
     const errorMessage = document.getElementById('errorMessage');
